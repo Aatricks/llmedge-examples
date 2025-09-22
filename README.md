@@ -2,6 +2,8 @@
 
 A tiny Android app that uses the llmedge library via a local AAR.
 
+Find the llmedge library here [main repo](https://github.com/Aatricks/llmedge).
+
 ## How it works
 - Consumes `llmedge-release.aar` located in `app/libs`.
 - Demonstrates blocking and streaming responses in `MainActivity` and a simple RAG flow in `RagActivity`.
