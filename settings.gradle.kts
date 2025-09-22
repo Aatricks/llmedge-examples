@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SmolLM-Example"
+rootProject.name = "llmedge-examples"
 include(":app")

@@ -4,10 +4,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example.smollmexample"
+    namespace = "com.example.llmedgeexample"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.example.smollmexample"
+    applicationId = "com.example.llmedgeexample"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -26,8 +26,8 @@ android {
 }
 
 dependencies {
-    // Use the prebuilt AAR; place smollm-release.aar in app/libs
-    implementation(files("libs/smollm-release.aar"))
+    // Use the prebuilt AAR; place llmedge-release.aar in app/libs
+    implementation(files("libs/llmedge-release.aar"))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     implementation("androidx.appcompat:appcompat:1.7.0")

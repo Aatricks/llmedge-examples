@@ -1,10 +1,10 @@
-# SmolLM Minimal Example App
+# llmedge Minimal Example App
 
-A tiny Android app that uses the SmolLM library via a local AAR.
+A tiny Android app that uses the llmedge library via a local AAR.
 
 ## How it works
-- Consumes `smollm-release.aar` located in `app/libs`.
-- Demonstrates blocking and streaming responses in `MainActivity`.
+- Consumes `llmedge-release.aar` located in `app/libs`.
+- Demonstrates blocking and streaming responses in `MainActivity` and a simple RAG flow in `RagActivity`.
 
 ## Prerequisites
 - Android SDK with NDK r27+, CMake 3.22+
@@ -12,20 +12,19 @@ A tiny Android app that uses the SmolLM library via a local AAR.
 
 ## Build & Run
 
-First build the AAR from the repo root and copy it into the example app:
+First build the AAR from the lib repo root and copy it into the example app:
 
 ```powershell
-cd ..\..\
-.\u200c\gradlew :smollm:assembleRelease
-Copy-Item -Force .\smollm\build\outputs\aar\smollm-release.aar .\examples\minimal-app\app\libs\smollm-release.aar
+.\gradlew :llmedge:assembleRelease
+Copy-Item -Force .\llmedge\build\outputs\aar\llmedge-release.aar .\llmedge-examples\app\libs\llmedge-release.aar
 ```
 
 Then build and install the example:
 
 ```powershell
-cd examples\minimal-app
-..\..\gradlew :app:assembleDebug
-..\..\gradlew :app:installDebug
+cd llmedge-examples
+..\gradlew :app:assembleDebug
+..\gradlew :app:installDebug
 ```
 
 Open the app on device. It first runs a blocking query, then streams a haiku.
