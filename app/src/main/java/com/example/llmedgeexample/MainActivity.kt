@@ -5,8 +5,8 @@ import android.content.Intent
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import io.shubham0204.smollm.SmolLM
-import io.shubham0204.smollm.SmolLM.InferenceParams
+import io.aatricks.llmedge.SmolLM
+import io.aatricks.llmedge.SmolLM.InferenceParams
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch

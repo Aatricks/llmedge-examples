@@ -8,11 +8,11 @@ import android.provider.OpenableColumns
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import io.shubham0204.smollm.SmolLM
-import io.shubham0204.smollm.SmolLM.InferenceParams
-import io.shubham0204.smollm.rag.RAGEngine
-import io.shubham0204.smollm.rag.EmbeddingConfig
-import io.shubham0204.smollm.rag.TextSplitter
+import io.aatricks.llmedge.SmolLM
+import io.aatricks.llmedge.SmolLM.InferenceParams
+import io.aatricks.llmedge.rag.RAGEngine
+import io.aatricks.llmedge.rag.EmbeddingConfig
+import io.aatricks.llmedge.rag.TextSplitter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
