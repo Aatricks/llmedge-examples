@@ -10,7 +10,7 @@ Find the llmedge library here [main repo](https://github.com/Aatricks/llmedge).
 
 ## Prerequisites
 - Android SDK with NDK r27+, CMake 3.22+
-- A GGUF model placed in `app/src/main/assets/YourModel.gguf` (rename as needed)
+- A GGUF model placed in `app/src/main/assets/YourModel.gguf` (rename as needed) (for example [smolm2-360M](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF))
 
 ## Build & Run
 
