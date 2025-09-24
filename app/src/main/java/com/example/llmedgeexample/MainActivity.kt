@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import io.aatricks.llmedge.SmolLM
 import io.aatricks.llmedge.SmolLM.InferenceParams
+import io.aatricks.llmedge.util.MemoryMetrics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -28,10 +29,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
+            val before = MemoryMetrics.snapshot(this@MainActivity)
+            withContext(Dispatchers.Main) {
+                output.text = "Vulkan enabled: ${llm.isVulkanEnabled()}\n" +
+                        before.toPretty(this@MainActivity) + "\n\n"
+            }
+
             val modelPath = copyAssetIfNeeded("YourModel.gguf")
             val modelFile = File(modelPath)
             withContext(Dispatchers.Main) {
-                output.text = "Preparing model...\nPath: $modelPath\nExists: ${modelFile.exists()}\nSize: ${if (modelFile.exists()) "${modelFile.length() / (1024 * 1024)} MB" else "n/a"}\n"
+                output.append("Preparing model...\nPath: $modelPath\nExists: ${modelFile.exists()}\nSize: ${if (modelFile.exists()) "${modelFile.length() / (1024 * 1024)} MB" else "n/a"}\n\n")
             }
 
             try {
@@ -44,8 +51,9 @@ class MainActivity : AppCompatActivity() {
                         contextSize = 8192L,
                     )
                 )
+                val afterLoad = MemoryMetrics.snapshot(this@MainActivity)
                 withContext(Dispatchers.Main) {
-                    output.append("\nLoaded OK.\n")
+                    output.append("Loaded OK.\n\nAfter load:\n" + afterLoad.toPretty(this@MainActivity) + "\n\n")
                 }
             } catch (t: Throwable) {
                 withContext(Dispatchers.Main) {
@@ -61,8 +69,9 @@ class MainActivity : AppCompatActivity() {
                 val blocking = withContext(Dispatchers.Default) {
                     llm.getResponse("Say 'hello from llmedge'.")
                 }
+                val afterBlocking = MemoryMetrics.snapshot(this@MainActivity)
                 withContext(Dispatchers.Main) {
-                    output.append("\nBlocking response:\n\n$blocking\n\nStreaming response:\n\n")
+                    output.append("Blocking response:\n\n$blocking\n\nAfter blocking:\n" + afterBlocking.toPretty(this@MainActivity) + "\n\nStreaming response:\n\n")
                 }
             } catch (t: Throwable) {
                 withContext(Dispatchers.Main) {
@@ -86,8 +95,10 @@ class MainActivity : AppCompatActivity() {
                         }
                 } != null
             }
+            val afterStream = MemoryMetrics.snapshot(this@MainActivity)
             withContext(Dispatchers.Main) {
-                output.append(if (ok) "\n\n[done]" else "\n\n[stream timed out]")
+                output.append(if (ok) "\n\n[done]\n\n" else "\n\n[stream timed out]\n\n")
+                output.append("After streaming:\n" + afterStream.toPretty(this@MainActivity))
             }
         }
     }
