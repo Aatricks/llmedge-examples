@@ -13,10 +13,11 @@ import io.aatricks.llmedge.SmolLM.InferenceParams
 import io.aatricks.llmedge.rag.RAGEngine
 import io.aatricks.llmedge.rag.EmbeddingConfig
 import io.aatricks.llmedge.rag.TextSplitter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import java.io.File
+import java.util.Locale
 
 class RagActivity : AppCompatActivity() {
     private val llm = SmolLM()
@@ -135,8 +136,9 @@ class RagActivity : AppCompatActivity() {
                 rag?.contextFor(q)
                 refreshContextPanel(contextView)
                 val a = rag?.ask(q) ?: "RAG not ready"
+                val metrics = llm.getLastGenerationMetrics()
                 answer.text = a
-                status.text = "Done"
+                status.text = "Done\n" + formatMetrics(metrics)
             } catch (t: Throwable) {
                 status.text = "Ask failed: ${t.message}"
             }
@@ -193,4 +195,10 @@ class RagActivity : AppCompatActivity() {
     }
 
     companion object { private const val REQ_PICK_PDF = 42 }
+
+    private fun formatMetrics(metrics: SmolLM.GenerationMetrics): String {
+        val throughput = String.format(Locale.US, "%.2f", metrics.tokensPerSecond)
+        val duration = String.format(Locale.US, "%.2f", metrics.elapsedSeconds)
+        return "tokens=${metrics.tokenCount} | $throughput tok/s | $duration s"
+    }
 }

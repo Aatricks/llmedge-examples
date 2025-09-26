@@ -1,7 +1,7 @@
 package com.example.llmedgeexample
 
-import android.os.Bundle
 import android.content.Intent
+import android.os.Bundle
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -69,9 +70,12 @@ class MainActivity : AppCompatActivity() {
                 val blocking = withContext(Dispatchers.Default) {
                     llm.getResponse("Say 'hello from llmedge'.")
                 }
+                val blockingMetrics = llm.getLastGenerationMetrics()
                 val afterBlocking = MemoryMetrics.snapshot(this@MainActivity)
                 withContext(Dispatchers.Main) {
-                    output.append("Blocking response:\n\n$blocking\n\nAfter blocking:\n" + afterBlocking.toPretty(this@MainActivity) + "\n\nStreaming response:\n\n")
+                    output.append("Blocking response:\n\n$blocking\n\n")
+                    output.append("Blocking metrics: ${formatMetrics(blockingMetrics)}\n\n")
+                    output.append("After blocking:\n" + afterBlocking.toPretty(this@MainActivity) + "\n\nStreaming response:\n\n")
                 }
             } catch (t: Throwable) {
                 withContext(Dispatchers.Main) {
@@ -95,9 +99,13 @@ class MainActivity : AppCompatActivity() {
                         }
                 } != null
             }
+            val streamingMetrics = if (ok) llm.getLastGenerationMetrics() else null
             val afterStream = MemoryMetrics.snapshot(this@MainActivity)
             withContext(Dispatchers.Main) {
                 output.append(if (ok) "\n\n[done]\n\n" else "\n\n[stream timed out]\n\n")
+                streamingMetrics?.let {
+                    output.append("Streaming metrics: ${formatMetrics(it)}\n\n")
+                }
                 output.append("After streaming:\n" + afterStream.toPretty(this@MainActivity))
             }
         }
@@ -116,5 +124,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return outFile.absolutePath
+    }
+
+    private fun formatMetrics(metrics: SmolLM.GenerationMetrics): String {
+        val throughput = String.format(Locale.US, "%.2f", metrics.tokensPerSecond)
+        val duration = String.format(Locale.US, "%.2f", metrics.elapsedSeconds)
+        return "tokens=${metrics.tokenCount} | $throughput tok/s | $duration s"
     }
 }
