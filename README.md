@@ -6,11 +6,16 @@ Find the llmedge library here [main repo](https://github.com/Aatricks/llmedge).
 
 ## How it works
 - Consumes `llmedge-release.aar` located in `app/libs`.
-- Demonstrates blocking and streaming responses in `MainActivity` and a simple RAG flow in `RagActivity`.
+- `MainActivity` now presents a launcher menu for multiple demos.
+	- `LocalAssetDemoActivity` reproduces the original blocking + streaming flow using an on-device asset.
+	- `HuggingFaceDemoActivity` downloads a GGUF from the Hugging Face hub and immediately runs it via `SmolLM.loadFromHuggingFace`.
+	- `RagActivity` keeps the on-device RAG showcase intact.
 
 ## Prerequisites
 - Android SDK with NDK r27+, CMake 3.22+
-- A GGUF model placed in `app/src/main/assets/YourModel.gguf` (rename as needed) (for example [smolm2-360M](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF))
+- For the local asset demo only: place a GGUF model at `app/src/main/assets/YourModel.gguf`
+	(for example [smolm2-360M](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF)).
+	The Hugging Face demo downloads models on demand, so it does not require a bundled asset.
 
 ## Build & Run
 
@@ -29,8 +34,13 @@ cd llmedge-examples
 ..\gradlew :app:installDebug
 ```
 
-Open the app on device. It first runs a blocking query, then streams a haiku.
+Open the app on device and pick a demo from the launcher:
+
+- **Local GGUF asset**: copies the bundled model to app storage, runs a blocking prompt, then streams a haiku.
+- **Download from Hugging Face**: downloads (or reuses) a model from the hub and runs a quick prompt once loaded.
+- **RAG demo**: unchanged from the previous release.
 
 ## Notes
-- The app copies the model once from assets to app-private storage, then loads it from there.
+- The local asset demo copies the model once from assets to app-private storage, then loads it from there.
+- Hugging Face downloads are cached under `filesDir/hf-models/<repo>/<revision>/` for reuse.
 - Tune `numThreads` in `InferenceParams` for your device.

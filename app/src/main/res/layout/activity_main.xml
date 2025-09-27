@@ -7,24 +7,36 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="20dp">
 
         <TextView
-            android:id="@+id/output"
+            android:id="@+id/textIntro"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:textColor="@android:color/white"
-            android:background="#222"
-            android:padding="12dp"
-            android:text="Waiting..."/>
+            android:text="Select a demo to explore llmedge features."
+            android:textSize="18sp"
+            android:textColor="@android:color/black"
+            android:paddingBottom="16dp" />
+
+        <Button
+            android:id="@+id/btnOpenLocal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Local GGUF Asset Demo" />
+
+        <Button
+            android:id="@+id/btnOpenHuggingFace"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Download from Hugging Face" />
 
         <Button
             android:id="@+id/btnOpenRag"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Open RAG Demo"
-            android:layout_marginTop="12dp"/>
+            android:layout_marginTop="12dp"
+            android:text="Open RAG Demo" />
 
     </LinearLayout>
 </ScrollView>

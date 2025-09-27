@@ -40,4 +40,11 @@ dependencies {
 
      // Required: sentence-embeddings used by the library (file-based AAR does not pull transitives)
     implementation("io.gitlab.shubham0204:sentence-embeddings:v6")
+
+    // Hugging Face client dependencies (needed at runtime when using the library helper)
+    implementation("io.ktor:ktor-client-core:2.3.12")
+    implementation("io.ktor:ktor-client-okhttp:2.3.12")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 }
