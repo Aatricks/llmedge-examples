@@ -49,6 +49,30 @@
             android:layout_marginTop="8dp"
             android:text="Force re-download even if cached" />
 
+        <TextView
+            android:id="@+id/textReasoningHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Reasoning controls"
+            android:textStyle="bold" />
+
+        <CheckBox
+            android:id="@+id/checkboxDisableThinking"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Disable thinking traces (/no_think)" />
+
+        <EditText
+            android:id="@+id/inputReasoningBudget"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="Optional reasoning budget (e.g. 0 or -1)"
+            android:inputType="numberSigned"
+            android:maxLines="1" />
+
         <Button
             android:id="@+id/btnDownloadAndRun"
             android:layout_width="match_parent"

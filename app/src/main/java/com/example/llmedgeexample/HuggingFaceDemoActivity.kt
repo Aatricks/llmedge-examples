@@ -11,6 +11,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import io.aatricks.llmedge.SmolLM
 import io.aatricks.llmedge.SmolLM.InferenceParams
+import io.aatricks.llmedge.SmolLM.ThinkingMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,6 +33,8 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
         val inputRevision = findViewById<EditText>(R.id.inputRevision)
         val inputFilename = findViewById<EditText>(R.id.inputFilename)
         val forceDownload = findViewById<CheckBox>(R.id.checkboxForceDownload)
+        val disableThinking = findViewById<CheckBox>(R.id.checkboxDisableThinking)
+        val inputReasoningBudget = findViewById<EditText>(R.id.inputReasoningBudget)
         val textStatus = findViewById<TextView>(R.id.textStatus)
         val textOutput = findViewById<TextView>(R.id.textOutput)
         val button = findViewById<Button>(R.id.btnDownloadAndRun)
@@ -40,10 +43,20 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
             val modelId = inputModelId.text.toString().trim()
             val revision = inputRevision.text.toString().takeIf { it.isNotBlank() } ?: "main"
             val filename = inputFilename.text.toString().trim().takeIf { it.isNotEmpty() }
+            val disableThinkingChecked = disableThinking.isChecked
+            val reasoningBudgetText = inputReasoningBudget.text.toString().trim()
+            val parsedReasoningBudget = reasoningBudgetText.takeIf { it.isNotEmpty() }?.toIntOrNull()
 
             if (modelId.isEmpty()) {
                 if (isUiActive()) {
                     textStatus.text = "Please provide a model repository name."
+                }
+                return@setOnClickListener
+            }
+
+            if (reasoningBudgetText.isNotEmpty() && parsedReasoningBudget == null) {
+                if (isUiActive()) {
+                    textStatus.text = "Reasoning budget must be an integer (e.g. 0, -1)."
                 }
                 return@setOnClickListener
             }
@@ -72,6 +85,8 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                         storeChats = false,
                         numThreads = safeThreads,
                         contextSize = safeContext,
+                        thinkingMode = if (disableThinkingChecked) ThinkingMode.DISABLED else ThinkingMode.DEFAULT,
+                        reasoningBudget = parsedReasoningBudget,
                     )
 
                     val result = llm.loadFromHuggingFace(
@@ -100,7 +115,8 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                         textStatus.text = buildString {
                             append("Model ready $cacheStatus from $resolvedLabel: ${result.file.name}\n")
                             append("Heap allowance: ${heapMb}MB\n")
-                            append("Context: ${safeParams.contextSize} tokens | Threads: ${safeParams.numThreads}")
+                            append("Context: ${safeParams.contextSize} tokens | Threads: ${safeParams.numThreads}\n")
+                            append("Thinking enabled: ${llm.isThinkingEnabled()} (budget=${llm.getReasoningBudget()})")
                         }
                     }
 
@@ -121,6 +137,7 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                                     "throughput=${"%.2f".format(Locale.US, metrics.tokensPerSecond)} tok/s, " +
                                     "duration=${"%.2f".format(Locale.US, metrics.elapsedSeconds)} s",
                             )
+                            appendLine("Thinking mode: ${llm.getThinkingMode()} (budget=${llm.getReasoningBudget()})")
                             appendLine()
                             append("Stored at: ${result.file.absolutePath}")
                         }
