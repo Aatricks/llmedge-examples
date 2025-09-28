@@ -21,9 +21,9 @@
             android:id="@+id/inputModelId"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Model repo (e.g. TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF)"
+            android:hint="Model repo (e.g. unsloth/Qwen3-0.6B-GGUF)"
             android:inputType="textUri"
-            android:text="TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF" />
+            android:text="unsloth/Qwen3-0.6B-GGUF" />
 
         <EditText
             android:id="@+id/inputRevision"
