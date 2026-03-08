@@ -14,7 +14,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import io.aatricks.llmedge.BarkTTS
-import io.aatricks.llmedge.LLMEdgeManager
+import io.aatricks.llmedge.speech.AudioStreamEvent
+import io.aatricks.llmedge.speech.BarkLoadOptions
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
@@ -22,11 +23,12 @@ import java.nio.ByteOrder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Activity demonstrating text-to-speech synthesis using Bark via LLMEdgeManager.
+ * Activity demonstrating text-to-speech synthesis using Bark via LLMEdge.
  *
  * Features:
  * - Text input for speech synthesis
@@ -59,6 +61,7 @@ class TTSActivity : AppCompatActivity() {
     private var generationJob: Job? = null
     private var audioTrack: AudioTrack? = null
     private var lastAudioResult: BarkTTS.AudioResult? = null
+    private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, lifecycleScope) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,7 +74,6 @@ class TTSActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stopPlayback()
-        // LLMEdgeManager handles model cleanup automatically
     }
 
     private fun setupButtons() {
@@ -100,7 +102,7 @@ class TTSActivity : AppCompatActivity() {
     }
 
     private fun updateUIState() {
-        // With LLMEdgeManager, model download happens automatically on first use
+        // LLMEdge resolves and caches Bark weights automatically on first use
         statusLabel.text = "Ready - model will download on first use (~800MB)"
         downloadButton.text = "Generate (will download model)"
         downloadButton.visibility = View.VISIBLE
@@ -143,44 +145,45 @@ class TTSActivity : AppCompatActivity() {
             try {
                 val startTime = System.currentTimeMillis()
 
-                // Use LLMEdgeManager.SpeechSynthesisParams for configuration
-                val params = LLMEdgeManager.SpeechSynthesisParams(
+                var result: BarkTTS.AudioResult? = null
+                edge.speech.synthesizeStream(
                     text = text,
-                    // Uses default model: Green-Sky/bark-ggml / bark-small_weights-f16.bin
-                    seed = 0,
-                    temperature = 0.7f,
-                    fineTemperature = 0.5f,
-                    nThreads = Runtime.getRuntime().availableProcessors()
-                )
-
-                // Use LLMEdgeManager.synthesizeSpeech for TTS (it's a singleton object)
-                val result = LLMEdgeManager.synthesizeSpeech(
-                    context = applicationContext,
-                    params = params,
-                    onProgress = { step: BarkTTS.EncodingStep, progress: Int ->
-                        runOnUiThread {
-                            val stepName = when (step) {
-                                BarkTTS.EncodingStep.SEMANTIC -> "Semantic"
-                                BarkTTS.EncodingStep.COARSE -> "Coarse"
-                                BarkTTS.EncodingStep.FINE -> "Fine"
+                    params = BarkTTS.GenerateParams(nThreads = Runtime.getRuntime().availableProcessors()),
+                    loadOptions =
+                        BarkLoadOptions(
+                            seed = 0,
+                            temperature = 0.7f,
+                            fineTemperature = 0.5f,
+                        ),
+                ).collect { event ->
+                    when (event) {
+                        AudioStreamEvent.Started -> Unit
+                        is AudioStreamEvent.Progress -> {
+                            runOnUiThread {
+                                val stepName = when (event.step) {
+                                    BarkTTS.EncodingStep.SEMANTIC -> "Semantic"
+                                    BarkTTS.EncodingStep.COARSE -> "Coarse"
+                                    BarkTTS.EncodingStep.FINE -> "Fine"
+                                }
+                                progressLabel.text = "$stepName: ${event.percent}%"
+                                val base = when (event.step) {
+                                    BarkTTS.EncodingStep.SEMANTIC -> 0
+                                    BarkTTS.EncodingStep.COARSE -> 33
+                                    BarkTTS.EncodingStep.FINE -> 66
+                                }
+                                progressBar.progress = base + (event.percent / 3)
                             }
-                            progressLabel.text = "$stepName: $progress%"
-                            // Map total progress (3 steps, each 100%)
-                            val base = when (step) {
-                                BarkTTS.EncodingStep.SEMANTIC -> 0
-                                BarkTTS.EncodingStep.COARSE -> 33
-                                BarkTTS.EncodingStep.FINE -> 66
-                            }
-                            val totalProgress = base + (progress / 3)
-                            progressBar.progress = totalProgress
                         }
+                        is AudioStreamEvent.Result -> result = event.audio
+                        AudioStreamEvent.Completed -> Unit
                     }
-                )
+                }
+                val audioResult = requireNotNull(result) { "Speech generation completed without audio output" }
 
                 val genTime = System.currentTimeMillis() - startTime
 
                 withContext(Dispatchers.Main) {
-                    lastAudioResult = result
+                    lastAudioResult = audioResult
                     progressBar.visibility = View.GONE
                     progressLabel.text = "Complete"
                     
@@ -193,11 +196,11 @@ class TTSActivity : AppCompatActivity() {
                     saveButton.isEnabled = true
                     statusLabel.text = "Model ready"
 
-                    val timing = "Generated ${result.samples.size} samples " +
-                        "(${String.format("%.2f", result.durationSeconds)}s) in ${genTime / 1000L}s"
+                    val timing = "Generated ${audioResult.samples.size} samples " +
+                        "(${String.format("%.2f", audioResult.durationSeconds)}s) in ${genTime / 1000L}s"
                     timingLabel.text = timing
                     log(timing)
-                    log("Real-time factor: ${String.format("%.4f", result.durationSeconds * 1000.0 / genTime)}x")
+                    log("Real-time factor: ${String.format("%.4f", audioResult.durationSeconds * 1000.0 / genTime)}x")
                 }
             } catch (e: CancellationException) {
                 withContext(Dispatchers.Main) {

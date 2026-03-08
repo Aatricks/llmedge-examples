@@ -10,10 +10,8 @@ import android.provider.OpenableColumns
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.LLMEdgeManager
-import io.aatricks.llmedge.SmolLM
 import io.aatricks.llmedge.rag.EmbeddingConfig
-import io.aatricks.llmedge.rag.RAGEngine
+import io.aatricks.llmedge.rag.RAGSession
 import io.aatricks.llmedge.rag.TextSplitter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +25,7 @@ import kotlinx.coroutines.withContext
  * - PDF document indexing
  * - Semantic search and retrieval
  * - Context-aware question answering
- * - Memory-efficient operation via LLMEdgeManager
+ * - Memory-efficient operation via LLMEdge
  */
 class RagActivity : AppCompatActivity() {
     
@@ -37,8 +35,8 @@ class RagActivity : AppCompatActivity() {
         private const val BYTES_IN_MB = 1024L * 1024L
     }
     
-    private var llm: SmolLM? = null
-    private var rag: RAGEngine? = null
+    private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, lifecycleScope) }
+    private var rag: RAGSession? = null
     private var selectedPdf: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,37 +72,25 @@ class RagActivity : AppCompatActivity() {
                 }
             } else {
                 withContext(Dispatchers.Main) {
-                    status.text = "Loading LLM (via LLMEdgeManager)..."
+                    status.text = "Loading LLMEdge RAG session..."
                 }
             }
             
             try {
                 logMemoryState("Before LLM load")
-                
-                // Use the shared LLM instance from LLMEdgeManager
-                // This ensures proper resource management (e.g. unloading diffusion models)
-                val sharedLlm = withContext(Dispatchers.IO) {
-                    LLMEdgeManager.getSmolLM(this@RagActivity)
-                }
-                llm = sharedLlm
-
-                // Reset system prompt for RAG context
-                sharedLlm.addSystemPrompt(
-                    "You are a helpful assistant that only uses the provided context."
-                )
-
-                // Initialize RAG Engine with smaller chunk sizes for mobile
-                rag = RAGEngine(
-                    context = this@RagActivity,
-                    smolLM = sharedLlm,
-                    splitter = TextSplitter(chunkSize = 400, chunkOverlap = 80), // Smaller for mobile
-                    embeddingConfig = EmbeddingConfig(
-                        modelAssetPath = "embeddings/all-minilm-l6-v2/model.onnx",
-                        tokenizerAssetPath = "embeddings/all-minilm-l6-v2/tokenizer.json",
-                        useTokenTypeIds = false,
-                        outputTensorName = "sentence_embedding"
-                    )
-                ).also { it.init() }
+                rag =
+                    withContext(Dispatchers.IO) {
+                        edge.rag.createSession(
+                            splitter = TextSplitter(chunkSize = 400, chunkOverlap = 80),
+                            embeddingConfig =
+                                EmbeddingConfig(
+                                    modelAssetPath = "embeddings/all-minilm-l6-v2/model.onnx",
+                                    tokenizerAssetPath = "embeddings/all-minilm-l6-v2/tokenizer.json",
+                                    useTokenTypeIds = false,
+                                    outputTensorName = "sentence_embedding",
+                                ),
+                        ).also { it.init() }
+                    }
                 
                 logMemoryState("After LLM and RAG init")
                 
@@ -128,8 +114,6 @@ class RagActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Do NOT close llm here as it is managed by LLMEdgeManager
-        llm = null
         rag = null
     }
 
@@ -218,7 +202,7 @@ class RagActivity : AppCompatActivity() {
                 val a = withContext(Dispatchers.IO) {
                     rag?.ask(q) ?: "RAG not ready"
                 }
-                val metrics = llm?.getLastGenerationMetrics()
+                val metrics = rag?.getLastGenerationMetrics()
                 
                 logMemoryState("After RAG query")
                 
@@ -286,7 +270,7 @@ class RagActivity : AppCompatActivity() {
     }
 
     private fun refreshContextPanel(contextView: TextView): Boolean {
-        val ctx = rag?.getLastContext().orEmpty()
+        val ctx = rag?.engine?.getLastContext().orEmpty()
         val has = ctx.isNotBlank()
         contextView.text = if (!has) "(no context)" else ctx
         return has
@@ -299,7 +283,7 @@ class RagActivity : AppCompatActivity() {
         } ?: (uri.lastPathSegment ?: "PDF")
     }
 
-    private fun formatMetrics(metrics: SmolLM.GenerationMetrics): String {
+    private fun formatMetrics(metrics: io.aatricks.llmedge.SmolLM.GenerationMetrics): String {
         val throughput = String.format(Locale.US, "%.2f", metrics.tokensPerSecond)
         val duration = String.format(Locale.US, "%.2f", metrics.elapsedSeconds)
         return "tokens=${metrics.tokenCount} | $throughput tok/s | $duration s"

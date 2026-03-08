@@ -3,10 +3,16 @@ package com.example.llmedgeexample
 import android.app.Activity
 import android.os.Bundle
 import android.util.Log
+import io.aatricks.llmedge.LLMEdge
+import io.aatricks.llmedge.LLMEdgeConfig
+import io.aatricks.llmedge.image.GenerationStreamEvent
+import io.aatricks.llmedge.image.VideoGenerationRequest
+import io.aatricks.llmedge.model.ModelSpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -57,8 +63,6 @@ class HeadlessVideoTestActivity : Activity() {
         val forceSequential = intent.getBooleanExtra("force_sequential", false)
         val preferPerformanceMode = intent.getBooleanExtra("prefer_performance_mode", false)
 
-        io.aatricks.llmedge.LLMEdgeManager.preferPerformanceMode = preferPerformanceMode
-
         android.util.Log.e(TAG, "Parameters:")
         android.util.Log.e(TAG, "  Prompt: $prompt")
         android.util.Log.e(TAG, "  Frames: $frames")
@@ -82,7 +86,8 @@ class HeadlessVideoTestActivity : Activity() {
                     cfgScale,
                     seed,
                     taehvPath,
-                    forceSequential
+                    forceSequential,
+                    preferPerformanceMode,
             )
             // Finish activity after test completes
             withContext(Dispatchers.Main) { finish() }
@@ -104,16 +109,22 @@ class HeadlessVideoTestActivity : Activity() {
             cfgScale: Float,
             seed: Long,
             taehvPath: String?,
-            forceSequential: Boolean
+            forceSequential: Boolean,
+            preferPerformanceMode: Boolean,
     ) {
         val startTime = System.currentTimeMillis()
 
         try {
-            android.util.Log.e(TAG, "Starting video generation using LLMEdgeManager...")
+            android.util.Log.e(TAG, "Starting video generation using LLMEdge...")
             val genStartTime = System.currentTimeMillis()
-
+            val edge =
+                    LLMEdge.create(
+                            applicationContext,
+                            scope,
+                            LLMEdgeConfig(preferPerformanceMode = preferPerformanceMode),
+                    )
             val params =
-                    io.aatricks.llmedge.LLMEdgeManager.VideoGenerationParams(
+                    VideoGenerationRequest(
                             prompt = prompt,
                             videoFrames = frames,
                             width = width,
@@ -121,45 +132,54 @@ class HeadlessVideoTestActivity : Activity() {
                             steps = steps,
                             cfgScale = cfgScale,
                             seed = seed,
-                            flashAttn = true,
+                            flashAttention = true,
                             forceSequentialLoad = forceSequential,
-                            taehvPath = taehvPath,
+                            taehv = taehvPath?.let(ModelSpec::localFile),
                             easyCache =
                                     io.aatricks.llmedge.StableDiffusion.EasyCacheParams(
                                             enabled = true
                                     ),
                             loraModelDir = null,
-                            loraApplyMode = io.aatricks.llmedge.StableDiffusion.LoraApplyMode.AUTO
+                            loraApplyMode = io.aatricks.llmedge.StableDiffusion.LoraApplyMode.AUTO,
                     )
 
-            // 4. Generate with progress tracking
             var lastProgressTime = genStartTime
-            val generatedFrames =
-                    io.aatricks.llmedge.LLMEdgeManager.generateVideo(
-                            context = applicationContext,
-                            params = params
-                    ) { phase, current, total ->
-                        val now = System.currentTimeMillis()
-                        val elapsed = (now - lastProgressTime) / 1000.0
-                        if (elapsed > 1.0 || current == total
-                        ) { // Log every second or on completion
-                            lastProgressTime = now
-                            val percent =
-                                    if (total > 0) (current.toFloat() / total * 100).toInt() else 0
-                            android.util.Log.e(
-                                    TAG,
-                                    "Progress: $phase ($current/$total) - $percent%"
-                            )
+            var generatedFrames = emptyList<android.graphics.Bitmap>()
+            var metrics: io.aatricks.llmedge.StableDiffusion.GenerationMetrics? = null
+            try {
+                edge.image.generateVideo(params).collect { event ->
+                    when (event) {
+                        is GenerationStreamEvent.Progress -> {
+                            val now = System.currentTimeMillis()
+                            val elapsed = (now - lastProgressTime) / 1000.0
+                            if (elapsed > 1.0 || event.update.current == event.update.total) {
+                                lastProgressTime = now
+                                val percent =
+                                        if (event.update.total > 0) {
+                                            (event.update.current.toFloat() / event.update.total * 100).toInt()
+                                        } else {
+                                            0
+                                        }
+                                android.util.Log.e(
+                                        TAG,
+                                        "Progress: ${event.update.message} (${event.update.current}/${event.update.total}) - $percent%"
+                                )
+                            }
+                        }
+                        is GenerationStreamEvent.Completed -> {
+                            generatedFrames = event.frames
                         }
                     }
+                }
+                metrics = edge.image.getLastGenerationMetrics()
+            } finally {
+                edge.close()
+            }
 
             val genTime = System.currentTimeMillis() - genStartTime
             android.util.Log.e(TAG, "")
             android.util.Log.e(TAG, "✓ Video generation completed in ${genTime}ms")
             android.util.Log.e(TAG, "")
-
-            // 5. Extract metrics
-            val metrics = io.aatricks.llmedge.LLMEdgeManager.getLastDiffusionMetrics()
 
             android.util.Log.e(TAG, "========================================")
             android.util.Log.e(TAG, "Results Summary")

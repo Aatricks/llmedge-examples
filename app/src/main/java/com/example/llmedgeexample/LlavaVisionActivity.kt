@@ -17,7 +17,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toFile
 import java.io.File
-import io.aatricks.llmedge.LLMEdgeManager
 import io.aatricks.llmedge.vision.ImageUtils
 import io.aatricks.llmedge.vision.LocalImageDescriber
 import io.aatricks.llmedge.vision.ImageSource
@@ -35,6 +34,7 @@ class LlavaVisionActivity : AppCompatActivity() {
     // Use IO dispatcher for native JNI operations instead of MainScope which uses Main dispatcher
     // This provides better parallelism for blocking native calls
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, scope, preferPerformanceMode = false) }
 
     private val btnPick: Button by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.btnPickImage) }
     private val btnTake: Button by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.btnTakePicture) }
@@ -88,11 +88,6 @@ class LlavaVisionActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_llava_vision)
 
-        // Prefer performance mode during interactive examples to favor throughput
-        // DISABLED: Vulkan backend causing hangs on some devices. Reverting to CPU (stable).
-        // io.aatricks.llmedge.LLMEdgeManager.preferPerformanceMode = true
-        io.aatricks.llmedge.LLMEdgeManager.preferPerformanceMode = false
-
         // Views are initialized lazily via delegates
 
         btnPick.setOnClickListener {
@@ -143,10 +138,10 @@ class LlavaVisionActivity : AppCompatActivity() {
                     }
                 }
 
-                // OCR using LLMEdgeManager
+                // OCR using the vision client
                 val bmpForOcr = BitmapFactory.decodeFile(localInput.absolutePath)
                 val ocrText = try {
-                     LLMEdgeManager.extractText(this@LlavaVisionActivity, bmpForOcr)
+                    edge.vision.extractText(bmpForOcr)
                 } catch (e: Exception) {
                     Log.w(TAG, "OCR failed in local describe", e)
                     ""
@@ -212,7 +207,7 @@ class LlavaVisionActivity : AppCompatActivity() {
                 // 1. Run OCR
                 runOnUiThread { tvResult.text = "Running OCR..." }
                 val ocrText = try {
-                    LLMEdgeManager.extractText(this@LlavaVisionActivity, scaledBmp)
+                    edge.vision.extractText(scaledBmp)
                 } catch (e: Exception) {
                     Log.w(TAG, "OCR failed", e)
                     ""
@@ -244,12 +239,7 @@ class LlavaVisionActivity : AppCompatActivity() {
                 // 4. Run Vision Analysis
                 runOnUiThread { tvResult.text = "Running vision analysis (loading model)..." }
                 
-                val params = LLMEdgeManager.VisionAnalysisParams(
-                    image = scaledBmp,
-                    prompt = augmentedPrompt
-                )
-                
-                val resultText = LLMEdgeManager.analyzeImage(this@LlavaVisionActivity, params)
+                val resultText = edge.vision.analyze(scaledBmp, augmentedPrompt)
 
                 runOnUiThread {
                     progress.visibility = View.GONE
@@ -277,9 +267,6 @@ class LlavaVisionActivity : AppCompatActivity() {
                     }
                     tvResult.text = pretty
                 }
-
-                // Print a performance snapshot to help debug generation speeds
-                LLMEdgeManager.logPerformanceSnapshot()
 
             } catch (e: Exception) {
                 Log.e(TAG, "Vision demo failed", e)

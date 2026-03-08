@@ -6,10 +6,13 @@ import android.os.Bundle
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.LLMEdgeManager
+import io.aatricks.llmedge.model.ModelSpec
 import io.aatricks.llmedge.SmolLM
+import io.aatricks.llmedge.text.TextGenerationRequest
+import io.aatricks.llmedge.text.TextStreamEvent
 import io.aatricks.llmedge.util.MemoryMetrics
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -31,6 +34,8 @@ class LocalAssetDemoActivity : AppCompatActivity() {
         private const val BYTES_IN_MB = 1024L * 1024L
         private const val GENERATION_TIMEOUT_MS = 60_000L // 60 seconds
     }
+
+    private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, lifecycleScope) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,16 +82,16 @@ class LocalAssetDemoActivity : AppCompatActivity() {
                 }
 
                 // Blocking generation
-                val params = LLMEdgeManager.TextGenerationParams(
-                    prompt = "Say 'hello from llmedge'.",
-                    modelPath = modelPath,
-                    maxTokens = 50 // Limit output for demo
-                )
+                val modelSpec = ModelSpec.localFile(modelPath)
 
                 try {
                     val blocking = withContext(Dispatchers.IO) {
                         withTimeoutOrNull(GENERATION_TIMEOUT_MS) {
-                            LLMEdgeManager.generateText(this@LocalAssetDemoActivity, params)
+                            edge.text.generate(
+                                prompt = "Say 'hello from llmedge'.",
+                                model = modelSpec,
+                                maxTokens = 50,
+                            )
                         }
                     }
                     
@@ -95,7 +100,7 @@ class LocalAssetDemoActivity : AppCompatActivity() {
                             output.append("Blocking generation timed out.\n\n")
                         }
                     } else {
-                        val blockingMetrics = LLMEdgeManager.getLastTextGenerationMetrics()
+                        val blockingMetrics = edge.text.getLastGenerationMetrics()
                         val afterBlocking = MemoryMetrics.snapshot(this@LocalAssetDemoActivity)
                         withContext(Dispatchers.Main) {
                             output.append("Blocking response:\n\n$blocking\n\n")
@@ -119,21 +124,23 @@ class LocalAssetDemoActivity : AppCompatActivity() {
 
                 // Streaming generation
                 val sb = StringBuilder()
-                val streamParams = LLMEdgeManager.TextGenerationParams(
+                val streamRequest = TextGenerationRequest(
                     prompt = "Write a short haiku about Android.",
-                    modelPath = modelPath,
+                    model = modelSpec,
                     maxTokens = 100 // Limit for demo
                 )
                 
                 val ok = try {
                     withContext(Dispatchers.IO) {
                         withTimeoutOrNull(GENERATION_TIMEOUT_MS) {
-                            LLMEdgeManager.generateText(this@LocalAssetDemoActivity, streamParams) { piece ->
-                                sb.append(piece)
-                                runOnUiThread {
-                                    val currentText = output.text.toString()
-                                    val prefix = currentText.substringBefore("Streaming response:") + "Streaming response:\n\n"
-                                    output.text = prefix + sb.toString()
+                            edge.text.stream(streamRequest).collect { event ->
+                                if (event is TextStreamEvent.Chunk) {
+                                    sb.append(event.value)
+                                    runOnUiThread {
+                                        val currentText = output.text.toString()
+                                        val prefix = currentText.substringBefore("Streaming response:") + "Streaming response:\n\n"
+                                        output.text = prefix + sb.toString()
+                                    }
                                 }
                             }
                             true
@@ -147,7 +154,7 @@ class LocalAssetDemoActivity : AppCompatActivity() {
                     false
                 }
                 
-                val streamingMetrics = if (ok) LLMEdgeManager.getLastTextGenerationMetrics() else null
+                val streamingMetrics = if (ok) edge.text.getLastGenerationMetrics() else null
                 val afterStream = MemoryMetrics.snapshot(this@LocalAssetDemoActivity)
                 
                 logMemoryState("After streaming")

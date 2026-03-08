@@ -21,11 +21,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.CoroutineExceptionHandler
-import io.aatricks.llmedge.vision.ImageUtils
-import io.aatricks.llmedge.LLMEdgeManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
+import io.aatricks.llmedge.vision.ImageUtils
 
 class ImageToTextActivity : AppCompatActivity() {
     private val btnTake: Button by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.btnTakePicture) }
@@ -34,6 +33,7 @@ class ImageToTextActivity : AppCompatActivity() {
     private val progress: ProgressBar by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.progress) }
 
     private val TAG = "ImageToTextActivity"
+    private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, lifecycleScope) }
 
     private var photoUri: Uri? = null
     private var photoFile: File? = null
@@ -152,7 +152,7 @@ class ImageToTextActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.Main + handler) {
             try {
                 val start = System.currentTimeMillis()
-                val text = LLMEdgeManager.extractText(this@ImageToTextActivity, bitmap)
+                val text = edge.vision.extractText(bitmap)
                 val dur = System.currentTimeMillis() - start
                 Log.d(TAG, "OCR completed in ${dur}ms, textLength=${text.length}")
                 tvResult.text = text.ifEmpty { "(no text detected)" }
@@ -163,10 +163,5 @@ class ImageToTextActivity : AppCompatActivity() {
                 progress.visibility = View.GONE
             }
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        // LLMEdgeManager manages the engine lifecycle
     }
 }

@@ -10,8 +10,9 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.LLMEdgeManager
 import io.aatricks.llmedge.SmolLM
+import io.aatricks.llmedge.model.ModelSpec
+import io.aatricks.llmedge.text.TextModelOptions
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,6 +32,8 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
         private const val TAG = "HuggingFaceDemoActivity"
         private const val BYTES_IN_MB = 1024L * 1024L
     }
+
+    private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, lifecycleScope) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,19 +94,22 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                     logMemoryState("Before download")
                     
                     // 1. Download/Ensure model is available
-                    val modelFile = LLMEdgeManager.downloadModel(
-                        context = this@HuggingFaceDemoActivity,
-                        modelId = modelId,
-                        filename = filename,
-                        revision = revision,
-                        onProgress = { downloaded, total ->
+                    val modelSpec =
+                        ModelSpec.huggingFace(
+                            repoId = modelId,
+                            filename = filename,
+                            revision = revision,
+                            forceDownload = forceDownload.isChecked,
+                        )
+                    val modelFile = edge.models.prefetch(modelSpec) { progress ->
+                        val downloaded = progress.downloadedBytes
+                        val total = progress.totalBytes
                             runOnUiThread {
                                 if (isUiActive()) {
                                     textStatus.text = formatProgress(downloaded, total)
                                 }
                             }
                         }
-                    )
 
                     if (isUiActive()) {
                         textStatus.text = buildString {
@@ -120,26 +126,21 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                     else 
                         SmolLM.ThinkingMode.DEFAULT
 
-                    val params = LLMEdgeManager.TextGenerationParams(
-                        prompt = "List two quick facts about running GGUF models on Android.",
-                        systemPrompt = "You are a concise assistant running on-device.",
-                        modelPath = modelFile.absolutePath,
-                        modelId = modelId,
-                        modelFilename = filename ?: modelFile.name,
-                        revision = revision,
-                        thinkingMode = thinkingMode,
-                        reasoningBudget = parsedReasoningBudget
-                    )
-
                     // Use IO dispatcher for native JNI operations
                     val response = withContext(Dispatchers.IO) {
-                        LLMEdgeManager.generateText(
-                            context = this@HuggingFaceDemoActivity,
-                            params = params
+                        edge.text.generate(
+                            prompt = "List two quick facts about running GGUF models on Android.",
+                            model = ModelSpec.localFile(modelFile),
+                            systemPrompt = "You are a concise assistant running on-device.",
+                            options =
+                                TextModelOptions(
+                                    thinkingMode = thinkingMode,
+                                    reasoningBudget = parsedReasoningBudget,
+                                ),
                         )
                     }
 
-                    val metrics = LLMEdgeManager.getLastTextGenerationMetrics()
+                    val metrics = edge.text.getLastGenerationMetrics()
                     
                     logMemoryState("After generation")
 

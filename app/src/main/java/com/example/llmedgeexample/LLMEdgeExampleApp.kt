@@ -3,18 +3,13 @@ package com.example.llmedgeexample
 import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
-import android.util.Log
-import io.aatricks.llmedge.LLMEdgeManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import io.aatricks.llmedge.LLMEdge
 
 /**
  * Application class for LLMEdge Example app.
  *
  * Handles global application lifecycle events and memory management.
- * All model lifecycle is managed through LLMEdgeManager for proper resource coordination.
+ * Demo activities own and close their own LLMEdge instances.
  */
 class LLMEdgeExampleApp : Application() {
 
@@ -28,9 +23,6 @@ class LLMEdgeExampleApp : Application() {
         fun getInstance(): LLMEdgeExampleApp? = instance
     }
 
-    // Use IO dispatcher for operations that involve native JNI calls
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -43,7 +35,7 @@ class LLMEdgeExampleApp : Application() {
         logMemoryState("Application started")
         
         // Log Vulkan availability for debugging
-        val vulkanInfo = LLMEdgeManager.getVulkanDeviceInfo()
+        val vulkanInfo = LLMEdge.getVulkanDeviceInfo()
         if (vulkanInfo != null) {
             FileLogger.i(TAG, "Vulkan available: ${vulkanInfo.deviceCount} device(s), " +
                     "${vulkanInfo.freeMemoryMB}MB free / ${vulkanInfo.totalMemoryMB}MB total")
@@ -72,9 +64,7 @@ class LLMEdgeExampleApp : Application() {
         when (level) {
             TRIM_MEMORY_RUNNING_CRITICAL,
             TRIM_MEMORY_COMPLETE -> {
-                // Critical memory pressure - cancel any ongoing generation
-                FileLogger.w(TAG, "Critical memory pressure - canceling generations")
-                LLMEdgeManager.cancelGeneration()
+                FileLogger.w(TAG, "Critical memory pressure - active demo screens should cancel their own work")
             }
             TRIM_MEMORY_BACKGROUND,
             TRIM_MEMORY_MODERATE -> {
@@ -88,9 +78,6 @@ class LLMEdgeExampleApp : Application() {
         super.onLowMemory()
         FileLogger.w(TAG, "onLowMemory - critical memory situation")
         logMemoryState("Low memory callback")
-        
-        // Cancel any active generations
-        LLMEdgeManager.cancelGeneration()
     }
 
     /**
@@ -114,7 +101,7 @@ class LLMEdgeExampleApp : Application() {
         FileLogger.i(TAG, "  Low memory: ${memoryInfo.lowMemory}")
         
         // Log Vulkan memory if available
-        LLMEdgeManager.getVulkanDeviceInfo()?.let { vulkan ->
+        LLMEdge.getVulkanDeviceInfo()?.let { vulkan ->
             FileLogger.i(TAG, "  Vulkan: ${vulkan.freeMemoryMB}MB free / ${vulkan.totalMemoryMB}MB total")
         }
     }

@@ -73,7 +73,7 @@ This example application provides production-ready demonstrations of llmedge's c
 - Timestamp and SRT generation
 
 **Text-to-Speech (TTS)** (`TTSActivity.kt`)
-- Bark model download from Hugging Face via LLMEdgeManager
+- Bark model download from Hugging Face via `LLMEdge`
 - Text input for speech synthesis
 - Progress tracking during generation
 - Audio playback and WAV file saving
@@ -191,15 +191,15 @@ Cache persists across app restarts and is reused automatically.
 ### Basic LLM Inference
 
 ```kotlin
-// Using the high-level Manager API
+val edge = LLMEdge.create(context, lifecycleScope)
+
 CoroutineScope(Dispatchers.IO).launch {
-    val response = LLMEdgeManager.generateText(
-        context = context,
-        params = LLMEdgeManager.TextGenerationParams(
-            prompt = "Explain quantum computing concisely.",
-            modelId = "unsloth/Qwen3-0.6B-GGUF",
-            modelFilename = "Qwen3-0.6B-Q4_K_M.gguf"
-        )
+    val response = edge.text.generate(
+        prompt = "Explain quantum computing concisely.",
+        model = ModelSpec.huggingFace(
+            repoId = "unsloth/Qwen3-0.6B-GGUF",
+            filename = "Qwen3-0.6B-Q4_K_M.gguf",
+        ),
     )
     
     withContext(Dispatchers.Main) {
@@ -211,12 +211,11 @@ CoroutineScope(Dispatchers.IO).launch {
 ### RAG Pipeline
 
 ```kotlin
-// Access the underlying SmolLM instance from the manager for custom pipelines
-val smol = LLMEdgeManager.getSmolLM(context)
-val rag = RAGEngine(context, smol)
+val edge = LLMEdge.create(context, lifecycleScope)
+val rag = edge.rag.createSession()
+rag.init()
 
 CoroutineScope(Dispatchers.IO).launch {
-    rag.init()
     val chunks = rag.indexPdf(pdfUri)
     val answer = rag.ask("What are the main conclusions?")
 
@@ -229,25 +228,17 @@ CoroutineScope(Dispatchers.IO).launch {
 ### Speech-to-Text (Whisper)
 
 ```kotlin
-import io.aatricks.llmedge.LLMEdgeManager
+val edge = LLMEdge.create(context, lifecycleScope)
 
 CoroutineScope(Dispatchers.IO).launch {
     // Simple transcription
-    val text = LLMEdgeManager.transcribeAudioToText(
-        context = context,
-        audioSamples = audioSamples  // 16kHz mono PCM float32
-    )
+    val text = edge.speech.transcribeToText(audioSamples)
 
     // Full transcription with timing
-    val segments = LLMEdgeManager.transcribeAudio(
-        context = context,
-        params = LLMEdgeManager.TranscriptionParams(
-            audioSamples = audioSamples,
-            language = "en"
-        )
-    ) { progress ->
-        Log.d("Whisper", "Progress: $progress%")
-    }
+    val segments = edge.speech.transcribe(
+        audioSamples = audioSamples,
+        params = Whisper.TranscribeParams(language = "en"),
+    )
 
     withContext(Dispatchers.Main) {
         segments.forEach { segment ->
@@ -262,17 +253,14 @@ CoroutineScope(Dispatchers.IO).launch {
 For live captioning from a microphone:
 
 ```kotlin
-import io.aatricks.llmedge.LLMEdgeManager
-
 class LiveCaptionActivity : AppCompatActivity() {
-    private var transcriber: Whisper.StreamingTranscriber? = null
+    private var transcriber: StreamingTranscriptionSession? = null
 
     fun startLiveCaptions() {
         lifecycleScope.launch(Dispatchers.IO) {
             // Create streaming transcriber with sliding window
-            transcriber = LLMEdgeManager.createStreamingTranscriber(
-                context = this@LiveCaptionActivity,
-                params = LLMEdgeManager.StreamingTranscriptionParams(
+            transcriber = LLMEdge.create(this@LiveCaptionActivity, lifecycleScope).speech.createStreamingSession(
+                params = Whisper.StreamingParams(
                     stepMs = 3000,      // Process every 3 seconds
                     lengthMs = 10000,   // 10-second windows
                     language = "en",
@@ -281,7 +269,7 @@ class LiveCaptionActivity : AppCompatActivity() {
             )
 
             // Collect transcription results
-            transcriber?.start()?.collect { segment ->
+            transcriber?.events()?.collect { segment ->
                 withContext(Dispatchers.Main) {
                     captionTextView.text = segment.text
                 }
@@ -298,7 +286,6 @@ class LiveCaptionActivity : AppCompatActivity() {
 
     fun stopLiveCaptions() {
         transcriber?.stop()
-        LLMEdgeManager.stopStreamingTranscription()
     }
 }
 ```
@@ -307,44 +294,27 @@ class LiveCaptionActivity : AppCompatActivity() {
 
 
 ```kotlin
-import io.aatricks.llmedge.LLMEdgeManager
+val edge = LLMEdge.create(context, lifecycleScope)
 
 CoroutineScope(Dispatchers.IO).launch {
     // Generate speech (model auto-downloads on first use)
-    val audio = LLMEdgeManager.synthesizeSpeech(
-        context = context,
-        params = LLMEdgeManager.SpeechSynthesisParams(
-            text = "Hello, world!",
-            nThreads = 8  // Use more threads for faster generation
-        )
-    ) { step, progress ->
-        Log.d("Bark", "${step.name}: $progress%")
-    }
-
-    // Or save directly to file
-    val outputFile = File(context.cacheDir, "output.wav")
-    LLMEdgeManager.synthesizeSpeechToFile(
-        context = context,
-        text = "Hello, world!",
-        outputFile = outputFile
-    )
-
-    // Unload when done
-    LLMEdgeManager.unloadSpeechModels()
+    val audio = edge.speech.synthesize("Hello, world!")
+    audioPlayer.play(audio.samples, audio.sampleRate)
 }
 ```
 
 ### Image Generation
 
 ```kotlin
-val bitmap = LLMEdgeManager.generateImage(
-    context = this,
-    params = LLMEdgeManager.ImageGenerationParams(
+val edge = LLMEdge.create(this, lifecycleScope)
+
+val bitmap = edge.image.generate(
+    ImageGenerationRequest(
         prompt = "serene mountain landscape, sunset",
         width = 512,
         height = 512,
         steps = 20
-    )
+    ),
 )
 
 imageView.setImageBitmap(bitmap)
@@ -353,10 +323,11 @@ imageView.setImageBitmap(bitmap)
 ### Video Generation
 
 ```kotlin
+val edge = LLMEdge.create(this, lifecycleScope)
+
 // Automatic memory management and sequential loading
-val frames = LLMEdgeManager.generateVideo(
-    context = this,
-    params = LLMEdgeManager.VideoGenerationParams(
+edge.image.generateVideo(
+    VideoGenerationRequest(
         prompt = "cat walking through garden",
         videoFrames = 8,
         width = 512,
@@ -366,8 +337,8 @@ val frames = LLMEdgeManager.generateVideo(
         flowShift = 3.0f,
         forceSequentialLoad = true // Safe for most devices
     )
-) { status, current, total ->
-    Log.d("VideoGen", "$status")
+).collect { event ->
+    Log.d("VideoGen", event.toString())
 }
 ```
 
