@@ -52,7 +52,7 @@ This example application provides production-ready demonstrations of llmedge's c
 **Image Generation** (`StableDiffusionActivity.kt`)
 - Text-to-image synthesis using Stable Diffusion
 - LoRA Support: Toggle switch to apply Detail Tweaker LoRA, automatically downloaded from Hugging Face
-- EasyCache: Auto-enabled acceleration for supported models
+- EasyCache: Auto-enabled acceleration for supported DiT models (Flux, SD3, Wan, Qwen Image, Z-Image)
 - Memory-aware configuration options
 - Progressive generation with cancellation support
 - Demonstrates VAE loading and tensor offloading strategies

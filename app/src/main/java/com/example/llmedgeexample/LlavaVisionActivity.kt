@@ -55,7 +55,7 @@ class LlavaVisionActivity : AppCompatActivity() {
             scope.launch {
                 try {
                     val bmp = ImageUtils.imageToBitmap(this@LlavaVisionActivity, ImageSource.UriSource(uri))
-                    val displayBmp = ImageUtils.preprocessImage(bmp, correctOrientation = true, maxDimension = 1024, enhance = false)
+                    val displayBmp = ImageUtils.preprocessBitmap(bmp, maxDimension = 1024, enhance = false)
                     runOnUiThread {
                         imagePreview.setImageBitmap(displayBmp)
                     }
@@ -70,7 +70,7 @@ class LlavaVisionActivity : AppCompatActivity() {
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         if (bitmap != null) {
-            val safeBmp = ImageUtils.preprocessImage(bitmap, correctOrientation = true, maxDimension = 1600, enhance = false)
+            val safeBmp = ImageUtils.preprocessBitmap(bitmap, maxDimension = 1600, enhance = false)
             imagePreview.setImageBitmap(safeBmp)
             val file = File.createTempFile("llava_input", ".jpg", cacheDir)
             try {
@@ -130,7 +130,7 @@ class LlavaVisionActivity : AppCompatActivity() {
                 val localInput = File.createTempFile("llava_input", ".jpg", cacheDir)
                 try {
                     val bmp = ImageUtils.imageToBitmap(this@LlavaVisionActivity, ImageSource.UriSource(uri))
-                    val scaled = ImageUtils.preprocessImage(bmp, correctOrientation = true, maxDimension = 1600, enhance = false)
+                    val scaled = ImageUtils.preprocessBitmap(bmp, maxDimension = 1600, enhance = false)
                     localInput.outputStream().use { out -> scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out) }
                 } catch (e: Exception) {
                     contentResolver.openInputStream(uri)?.use { ins ->
@@ -202,7 +202,7 @@ class LlavaVisionActivity : AppCompatActivity() {
                 
                 // Load bitmap
                 val bmp = ImageUtils.imageToBitmap(this@LlavaVisionActivity, ImageSource.UriSource(uri))
-                val scaledBmp = ImageUtils.preprocessImage(bmp, correctOrientation = true, maxDimension = 1024, enhance = false)
+                val scaledBmp = ImageUtils.preprocessBitmap(bmp, maxDimension = 1024, enhance = false)
 
                 // 1. Run OCR
                 runOnUiThread { tvResult.text = "Running OCR..." }
