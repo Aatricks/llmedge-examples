@@ -283,7 +283,7 @@ class RagActivity : AppCompatActivity() {
         } ?: (uri.lastPathSegment ?: "PDF")
     }
 
-    private fun formatMetrics(metrics: io.aatricks.llmedge.SmolLM.GenerationMetrics): String {
+    private fun formatMetrics(metrics: io.aatricks.llmedge.text.runtime.SmolLM.GenerationMetrics): String {
         val throughput = String.format(Locale.US, "%.2f", metrics.tokensPerSecond)
         val duration = String.format(Locale.US, "%.2f", metrics.elapsedSeconds)
         return "tokens=${metrics.tokenCount} | $throughput tok/s | $duration s"

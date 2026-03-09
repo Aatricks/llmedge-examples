@@ -5,9 +5,9 @@ import android.os.Bundle
 import android.util.Log
 import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.LLMEdgeConfig
-import io.aatricks.llmedge.EasyCacheParams
-import io.aatricks.llmedge.GenerationMetrics
-import io.aatricks.llmedge.LoraApplyMode
+import io.aatricks.llmedge.image.diffusion.EasyCacheParams
+import io.aatricks.llmedge.image.diffusion.GenerationMetrics
+import io.aatricks.llmedge.image.diffusion.LoraApplyMode
 import io.aatricks.llmedge.image.GenerationStreamEvent
 import io.aatricks.llmedge.image.VideoGenerationRequest
 import io.aatricks.llmedge.model.ModelSpec
@@ -139,16 +139,16 @@ class HeadlessVideoTestActivity : Activity() {
                             forceSequentialLoad = forceSequential,
                             taehv = taehvPath?.let(ModelSpec::localFile),
                             easyCache =
-                                    io.aatricks.llmedge.EasyCacheParams(
+                                    EasyCacheParams(
                                             enabled = true
                                     ),
                             loraModelDir = null,
-                            loraApplyMode = io.aatricks.llmedge.LoraApplyMode.AUTO,
+                            loraApplyMode = LoraApplyMode.AUTO,
                     )
 
             var lastProgressTime = genStartTime
             var generatedFrames = emptyList<android.graphics.Bitmap>()
-            var metrics: io.aatricks.llmedge.GenerationMetrics? = null
+            var metrics: GenerationMetrics? = null
             try {
                 edge.image.generateVideo(params).collect { event ->
                     when (event) {

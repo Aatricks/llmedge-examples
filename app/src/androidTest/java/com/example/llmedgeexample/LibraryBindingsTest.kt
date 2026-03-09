@@ -3,10 +3,10 @@ package com.example.llmedgeexample
 import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import io.aatricks.llmedge.BarkTTS
-import io.aatricks.llmedge.SmolLM
-import io.aatricks.llmedge.StableDiffusion
-import io.aatricks.llmedge.Whisper
+import io.aatricks.llmedge.speech.tts.BarkTTS
+import io.aatricks.llmedge.text.runtime.SmolLM
+import io.aatricks.llmedge.image.diffusion.StableDiffusion
+import io.aatricks.llmedge.speech.stt.Whisper
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith

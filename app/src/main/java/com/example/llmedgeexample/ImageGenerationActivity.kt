@@ -14,7 +14,7 @@ import android.widget.Switch
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import io.aatricks.llmedge.LLMEdge
-import io.aatricks.llmedge.LoraApplyMode
+import io.aatricks.llmedge.image.diffusion.LoraApplyMode
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -157,7 +157,7 @@ class ImageGenerationActivity : AppCompatActivity() {
 
                 val useFlashAttn = width >= 512 && height >= 512
 
-                val loraApplyMode = io.aatricks.llmedge.LoraApplyMode.AUTO
+                val loraApplyMode = LoraApplyMode.AUTO
 
                 val params = ImageGenerationRequest(
                     prompt = prompt,

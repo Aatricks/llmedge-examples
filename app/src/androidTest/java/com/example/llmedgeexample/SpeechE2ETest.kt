@@ -3,8 +3,8 @@ package com.example.llmedgeexample
 import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import io.aatricks.llmedge.BarkTTS
-import io.aatricks.llmedge.Whisper
+import io.aatricks.llmedge.speech.tts.BarkTTS
+import io.aatricks.llmedge.speech.stt.Whisper
 import io.aatricks.llmedge.huggingface.HuggingFaceHub
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue

@@ -1,7 +1,7 @@
 package com.example.llmedgeexample.samples
 
 import android.content.Context
-import io.aatricks.llmedge.SmolLM
+import io.aatricks.llmedge.text.runtime.SmolLM
 import io.aatricks.llmedge.tools.DeviceToolFactory
 import io.aatricks.llmedge.tools.LLMAgent
 import kotlinx.coroutines.runBlocking

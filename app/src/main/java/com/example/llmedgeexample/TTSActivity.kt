@@ -13,7 +13,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.BarkTTS
+import io.aatricks.llmedge.speech.tts.BarkTTS
 import io.aatricks.llmedge.speech.AudioStreamEvent
 import io.aatricks.llmedge.speech.BarkLoadOptions
 import java.io.File

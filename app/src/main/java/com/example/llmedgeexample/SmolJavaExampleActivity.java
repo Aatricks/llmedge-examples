@@ -6,8 +6,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
-import io.aatricks.llmedge.SmolLM;
-import io.aatricks.llmedge.SmolLMJavaCompat;
+import io.aatricks.llmedge.text.runtime.SmolLM;
+import io.aatricks.llmedge.text.runtime.SmolLMJavaCompat;
 
 import java.io.File;
 

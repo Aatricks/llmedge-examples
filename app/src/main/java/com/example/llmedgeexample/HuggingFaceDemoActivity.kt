@@ -10,7 +10,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.SmolLM
+import io.aatricks.llmedge.text.runtime.SmolLM
 import io.aatricks.llmedge.model.ModelSpec
 import io.aatricks.llmedge.text.TextModelOptions
 import java.util.Locale

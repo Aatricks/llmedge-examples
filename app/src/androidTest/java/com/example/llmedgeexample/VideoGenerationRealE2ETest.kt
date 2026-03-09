@@ -5,9 +5,9 @@ import android.content.Context
 import android.os.Debug
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import io.aatricks.llmedge.StableDiffusion
-import io.aatricks.llmedge.SampleMethod
-import io.aatricks.llmedge.VideoGenerateParams
+import io.aatricks.llmedge.image.diffusion.StableDiffusion
+import io.aatricks.llmedge.image.diffusion.SampleMethod
+import io.aatricks.llmedge.image.diffusion.VideoGenerateParams
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -155,7 +155,7 @@ class VideoGenerationRealE2ETest {
                 modelPath = modelFile.file.absolutePath,
                 vaePath = vaeFile.file.absolutePath,
                 t5xxlPath = t5xxlFile.file.absolutePath,
-                nThreads = io.aatricks.llmedge.CpuTopology.getOptimalThreadCount(io.aatricks.llmedge.CpuTopology.TaskType.DIFFUSION),
+                nThreads = io.aatricks.llmedge.runtime.CpuTopology.getOptimalThreadCount(io.aatricks.llmedge.runtime.CpuTopology.TaskType.DIFFUSION),
                 offloadToCpu = true,
                 keepClipOnCpu = true,
                 keepVaeOnCpu = true,

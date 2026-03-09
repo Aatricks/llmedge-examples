@@ -2,9 +2,9 @@ package com.example.llmedgeexample.samples
 
 import android.content.Context
 import android.graphics.Bitmap
-import io.aatricks.llmedge.StableDiffusion
-import io.aatricks.llmedge.GenerateParams
-import io.aatricks.llmedge.VideoGenerateParams
+import io.aatricks.llmedge.image.diffusion.StableDiffusion
+import io.aatricks.llmedge.image.diffusion.GenerateParams
+import io.aatricks.llmedge.image.diffusion.VideoGenerateParams
 import java.io.File
 
 object SimpleGenerator {

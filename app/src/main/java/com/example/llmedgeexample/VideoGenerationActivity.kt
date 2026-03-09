@@ -25,11 +25,11 @@ import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.image.GenerationStreamEvent
 import io.aatricks.llmedge.image.VideoGenerationRequest
 import io.aatricks.llmedge.model.ModelSpec
-import io.aatricks.llmedge.StableDiffusion
-import io.aatricks.llmedge.EasyCacheParams
-import io.aatricks.llmedge.LoraApplyMode
-import io.aatricks.llmedge.SampleMethod
-import io.aatricks.llmedge.Scheduler
+import io.aatricks.llmedge.image.diffusion.StableDiffusion
+import io.aatricks.llmedge.image.diffusion.EasyCacheParams
+import io.aatricks.llmedge.image.diffusion.LoraApplyMode
+import io.aatricks.llmedge.image.diffusion.SampleMethod
+import io.aatricks.llmedge.image.diffusion.Scheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
