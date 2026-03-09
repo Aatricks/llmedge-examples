@@ -134,6 +134,8 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                             systemPrompt = "You are a concise assistant running on-device.",
                             options =
                                 TextModelOptions(
+                                    useVulkan = false,
+                                    useFlashAttention = false,
                                     thinkingMode = thinkingMode,
                                     reasoningBudget = parsedReasoningBudget,
                                 ),

@@ -83,6 +83,10 @@ class LocalAssetDemoActivity : AppCompatActivity() {
 
                 // Blocking generation
                 val modelSpec = ModelSpec.localFile(modelPath)
+                val safeTextOptions = io.aatricks.llmedge.text.TextModelOptions(
+                    useVulkan = false,
+                    useFlashAttention = false,
+                )
 
                 try {
                     val blocking = withContext(Dispatchers.IO) {
@@ -90,6 +94,7 @@ class LocalAssetDemoActivity : AppCompatActivity() {
                             edge.text.generate(
                                 prompt = "Say 'hello from llmedge'.",
                                 model = modelSpec,
+                                options = safeTextOptions,
                                 maxTokens = 50,
                             )
                         }
@@ -127,6 +132,7 @@ class LocalAssetDemoActivity : AppCompatActivity() {
                 val streamRequest = TextGenerationRequest(
                     prompt = "Write a short haiku about Android.",
                     model = modelSpec,
+                    options = safeTextOptions,
                     maxTokens = 100 // Limit for demo
                 )
                 

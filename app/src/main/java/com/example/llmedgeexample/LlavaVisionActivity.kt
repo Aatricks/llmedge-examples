@@ -218,23 +218,17 @@ class LlavaVisionActivity : AppCompatActivity() {
                 val height = scaledBmp.height
                 val dimsText = "${width}x${height}"
                 
-                // 3. Build Prompt (ChatML format for Phi-3)
-                val sb = StringBuilder()
-                sb.append("<|system|>\n")
-                sb.append("You are a helpful assistant.")
-                sb.append("<|end|>\n")
-                sb.append("<|user|>\n") // Start user message
-                sb.append("Context (image + OCR):\n")
-                sb.append("- Image size: $dimsText\n")
-                if (ocrText.isNotBlank()) {
-                    sb.append("- OCR: $ocrText\n")
+                // 3. Build a plain prompt and let the library/model template own the chat formatting.
+                val augmentedPrompt = buildString {
+                    appendLine("Describe the image using the prepared visual context.")
+                    appendLine("Return compact JSON with keys: objects, attributes, text.")
+                    appendLine("Image size: $dimsText")
+                    if (ocrText.isNotBlank()) {
+                        appendLine("OCR text: ${ocrText.take(1000)}")
+                    }
+                    appendLine()
+                    appendLine("User request: $promptText")
                 }
-                sb.append("\n")
-                sb.append("$promptText\n") // User's simple question
-                sb.append("<|end|>\n") // End user message
-                sb.append("<|assistant|>\n") // Start assistant message (for generation)
-
-                val augmentedPrompt = sb.toString()
 
                 // 4. Run Vision Analysis
                 runOnUiThread { tvResult.text = "Running vision analysis (loading model)..." }
