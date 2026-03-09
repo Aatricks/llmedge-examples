@@ -26,6 +26,10 @@ import io.aatricks.llmedge.image.GenerationStreamEvent
 import io.aatricks.llmedge.image.VideoGenerationRequest
 import io.aatricks.llmedge.model.ModelSpec
 import io.aatricks.llmedge.StableDiffusion
+import io.aatricks.llmedge.EasyCacheParams
+import io.aatricks.llmedge.LoraApplyMode
+import io.aatricks.llmedge.SampleMethod
+import io.aatricks.llmedge.Scheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -170,9 +174,9 @@ class VideoGenerationActivity : AppCompatActivity() {
         progressBar.visibility = View.GONE
 
         // Initialize sampler spinner - show recommended samplers for Wan first
-        val recommendedSamplers = StableDiffusion.SampleMethod.WAN_RECOMMENDED
+        val recommendedSamplers = SampleMethod.WAN_RECOMMENDED
         val otherSamplers =
-                StableDiffusion.SampleMethod.values().filter { it !in recommendedSamplers }
+                SampleMethod.values().filter { it !in recommendedSamplers }
         val orderedSamplers = recommendedSamplers + otherSamplers
         val samplerNames =
                 orderedSamplers.map {
@@ -183,7 +187,7 @@ class VideoGenerationActivity : AppCompatActivity() {
                 ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, samplerNames)
 
         // Initialize scheduler spinner with user-friendly names
-        val schedulerNames = StableDiffusion.Scheduler.values().map { it.name.replace("_", " ") }
+        val schedulerNames = Scheduler.values().map { it.name.replace("_", " ") }
         schedulerSpinner.adapter =
                 ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, schedulerNames)
 
@@ -484,13 +488,13 @@ class VideoGenerationActivity : AppCompatActivity() {
         val flowShift = parseFlowShiftField() ?: return
 
         // Get sampler and scheduler from spinners (using the same ordered list as initialization)
-        val recommendedSamplers = StableDiffusion.SampleMethod.WAN_RECOMMENDED
+        val recommendedSamplers = SampleMethod.WAN_RECOMMENDED
         val otherSamplers =
-                StableDiffusion.SampleMethod.values().filter { it !in recommendedSamplers }
+                SampleMethod.values().filter { it !in recommendedSamplers }
         val orderedSamplers = recommendedSamplers + otherSamplers
         val selectedSampleMethod = orderedSamplers[samplerSpinner.selectedItemPosition]
         val selectedScheduler =
-                StableDiffusion.Scheduler.values()[schedulerSpinner.selectedItemPosition]
+                Scheduler.values()[schedulerSpinner.selectedItemPosition]
 
         // Get LoRA path from file selector
         val loraDir = selectedLoraPath
@@ -576,12 +580,12 @@ class VideoGenerationActivity : AppCompatActivity() {
                                         loraModelDir = loraDir
                                                         ?: getExternalFilesDir("loras")
                                                                 ?.absolutePath,
-                                        loraApplyMode = StableDiffusion.LoraApplyMode.AUTO,
+                                        loraApplyMode = LoraApplyMode.AUTO,
                                         taehv = taehvPath?.let(ModelSpec::localFile),
                                         initImage = resizedInitImage,
                                         strength = i2vStrength,
                                         easyCache =
-                                                StableDiffusion.EasyCacheParams(
+                                                EasyCacheParams(
                                                         enabled = true,
                                                         reuseThreshold = 0.2f,
                                                         startPercent = 0.15f,
