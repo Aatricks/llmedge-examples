@@ -136,7 +136,9 @@ class ImageGenerationActivity : AppCompatActivity() {
                                 updateProgressUI(0, "Downloading LoRA: $percent%")
                             }
                         )
-                        loraModelDir = result.file.parentFile.absolutePath
+                        loraModelDir = requireNotNull(result.file.parentFile) {
+                            "Downloaded LoRA file is missing a parent directory"
+                        }.absolutePath
                         val loraName = result.file.nameWithoutExtension
                         prompt += " <lora:$loraName:1.0>"
                     } catch (e: Exception) {
@@ -175,10 +177,8 @@ class ImageGenerationActivity : AppCompatActivity() {
                 // Log memory after generation
                 logMemoryState("After image generation")
 
-                if (bitmap != null) {
-                    withContext(Dispatchers.Main) {
-                        previewImage.setImageBitmap(bitmap)
-                    }
+                withContext(Dispatchers.Main) {
+                    previewImage.setImageBitmap(bitmap)
                 }
 
                 // Show metrics
@@ -278,19 +278,16 @@ class ImageGenerationActivity : AppCompatActivity() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        when (level) {
-            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW,
-            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
-                android.util.Log.w(TAG, "System memory low (level=$level)")
-                if (generationJob?.isActive == true) {
-                    cancelGeneration()
-                    runOnUiThread {
-                        Toast.makeText(
-                            this,
-                            "Generation cancelled due to low memory",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+        if (TrimMemorySupport.isRunningLow(level)) {
+            android.util.Log.w(TAG, "System memory low (level=$level)")
+            if (generationJob?.isActive == true) {
+                cancelGeneration()
+                runOnUiThread {
+                    Toast.makeText(
+                        this,
+                        "Generation cancelled due to low memory",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }

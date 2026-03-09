@@ -797,20 +797,17 @@ class VideoGenerationActivity : AppCompatActivity() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        when (level) {
-            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW,
-            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
-                FileLogger.w(TAG, "System memory low (level=$level), cancelling if active")
-                if (generationJob?.isActive == true) {
-                    cancelGeneration()
-                    runOnUiThread {
-                        Toast.makeText(
-                                        this,
-                                        "Generation cancelled due to low memory",
-                                        Toast.LENGTH_LONG
-                                )
-                                .show()
-                    }
+        if (TrimMemorySupport.isRunningLow(level)) {
+            FileLogger.w(TAG, "System memory low (level=$level), cancelling if active")
+            if (generationJob?.isActive == true) {
+                cancelGeneration()
+                runOnUiThread {
+                    Toast.makeText(
+                                    this,
+                                    "Generation cancelled due to low memory",
+                                    Toast.LENGTH_LONG
+                            )
+                            .show()
                 }
             }
         }

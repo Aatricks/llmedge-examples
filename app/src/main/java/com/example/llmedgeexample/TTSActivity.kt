@@ -216,7 +216,7 @@ class TTSActivity : AppCompatActivity() {
                     generateButton.isEnabled = true
                     statusLabel.text = "Generation failed: ${e.message}"
                     log("Error: ${e.message}")
-                    e.printStackTrace()
+                    FileLogger.e(TAG, "Generation failed", e)
                 }
             }
         }

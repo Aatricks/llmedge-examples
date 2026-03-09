@@ -47,27 +47,16 @@ class LLMEdgeExampleApp : Application() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
 
-        val levelName = when (level) {
-            TRIM_MEMORY_RUNNING_MODERATE -> "RUNNING_MODERATE"
-            TRIM_MEMORY_RUNNING_LOW -> "RUNNING_LOW"
-            TRIM_MEMORY_RUNNING_CRITICAL -> "RUNNING_CRITICAL"
-            TRIM_MEMORY_UI_HIDDEN -> "UI_HIDDEN"
-            TRIM_MEMORY_BACKGROUND -> "BACKGROUND"
-            TRIM_MEMORY_MODERATE -> "MODERATE"
-            TRIM_MEMORY_COMPLETE -> "COMPLETE"
-            else -> "UNKNOWN($level)"
-        }
+        val levelName = TrimMemorySupport.describe(level)
 
         FileLogger.i(TAG, "onTrimMemory: level=$levelName")
         logMemoryState("Before memory cleanup")
 
-        when (level) {
-            TRIM_MEMORY_RUNNING_CRITICAL,
-            TRIM_MEMORY_COMPLETE -> {
+        when {
+            TrimMemorySupport.isCritical(level) -> {
                 FileLogger.w(TAG, "Critical memory pressure - active demo screens should cancel their own work")
             }
-            TRIM_MEMORY_BACKGROUND,
-            TRIM_MEMORY_MODERATE -> {
+            TrimMemorySupport.isBackgroundPressure(level) -> {
                 // App is backgrounded or moderate pressure - allow GC to run
                 FileLogger.i(TAG, "Moderate memory pressure - allowing GC")
             }
