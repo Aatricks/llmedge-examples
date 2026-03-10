@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application
         android:name=".LLMEdgeExampleApp"
@@ -36,10 +37,6 @@
             android:exported="false"
         />
             <activity android:name=".LlavaVisionActivity" />
-        <activity
-            android:name=".StableDiffusionActivity"
-            android:exported="false"
-        />
         <activity
             android:name=".VideoGenerationActivity"
             android:exported="false"
