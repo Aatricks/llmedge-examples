@@ -18,17 +18,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
-        create("debug_key") {
-            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        val debugKeystore = file("${System.getProperty("user.home")}/.android/debug.keystore")
+        if (debugKeystore.exists()) {
+            create("debug_key") {
+                storeFile = debugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug_key")
+            val debugKeySigning = signingConfigs.findByName("debug_key")
+            if (debugKeySigning != null) {
+                signingConfig = debugKeySigning
+            }
         }
     }
     compileOptions {
