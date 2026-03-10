@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import io.aatricks.llmedge.image.diffusion.StableDiffusion
 import io.aatricks.llmedge.image.diffusion.GenerateParams
 import io.aatricks.llmedge.image.diffusion.VideoGenerateParams
-import io.aatricks.llmedge.image.diffusion.txt2vid
 import java.io.File
 
 object SimpleGenerator {
