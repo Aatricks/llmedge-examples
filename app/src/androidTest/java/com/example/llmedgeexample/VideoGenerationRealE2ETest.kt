@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.aatricks.llmedge.image.diffusion.StableDiffusion
 import io.aatricks.llmedge.image.diffusion.SampleMethod
 import io.aatricks.llmedge.image.diffusion.VideoGenerateParams
+import io.aatricks.llmedge.image.diffusion.txt2vid
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
