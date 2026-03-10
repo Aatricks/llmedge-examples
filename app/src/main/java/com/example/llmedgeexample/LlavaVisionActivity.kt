@@ -17,7 +17,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toFile
 import java.io.File
-import io.aatricks.llmedge.LLMEdgeManager
 import io.aatricks.llmedge.vision.ImageUtils
 import io.aatricks.llmedge.vision.LocalImageDescriber
 import io.aatricks.llmedge.vision.ImageSource
@@ -35,6 +34,7 @@ class LlavaVisionActivity : AppCompatActivity() {
     // Use IO dispatcher for native JNI operations instead of MainScope which uses Main dispatcher
     // This provides better parallelism for blocking native calls
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, scope, preferPerformanceMode = false) }
 
     private val btnPick: Button by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.btnPickImage) }
     private val btnTake: Button by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.btnTakePicture) }
@@ -55,7 +55,7 @@ class LlavaVisionActivity : AppCompatActivity() {
             scope.launch {
                 try {
                     val bmp = ImageUtils.imageToBitmap(this@LlavaVisionActivity, ImageSource.UriSource(uri))
-                    val displayBmp = ImageUtils.preprocessImage(bmp, correctOrientation = true, maxDimension = 1024, enhance = false)
+                    val displayBmp = ImageUtils.preprocessBitmap(bmp, maxDimension = 1024, enhance = false)
                     runOnUiThread {
                         imagePreview.setImageBitmap(displayBmp)
                     }
@@ -70,7 +70,7 @@ class LlavaVisionActivity : AppCompatActivity() {
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         if (bitmap != null) {
-            val safeBmp = ImageUtils.preprocessImage(bitmap, correctOrientation = true, maxDimension = 1600, enhance = false)
+            val safeBmp = ImageUtils.preprocessBitmap(bitmap, maxDimension = 1600, enhance = false)
             imagePreview.setImageBitmap(safeBmp)
             val file = File.createTempFile("llava_input", ".jpg", cacheDir)
             try {
@@ -87,11 +87,6 @@ class LlavaVisionActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_llava_vision)
-
-        // Prefer performance mode during interactive examples to favor throughput
-        // DISABLED: Vulkan backend causing hangs on some devices. Reverting to CPU (stable).
-        // io.aatricks.llmedge.LLMEdgeManager.preferPerformanceMode = true
-        io.aatricks.llmedge.LLMEdgeManager.preferPerformanceMode = false
 
         // Views are initialized lazily via delegates
 
@@ -135,7 +130,7 @@ class LlavaVisionActivity : AppCompatActivity() {
                 val localInput = File.createTempFile("llava_input", ".jpg", cacheDir)
                 try {
                     val bmp = ImageUtils.imageToBitmap(this@LlavaVisionActivity, ImageSource.UriSource(uri))
-                    val scaled = ImageUtils.preprocessImage(bmp, correctOrientation = true, maxDimension = 1600, enhance = false)
+                    val scaled = ImageUtils.preprocessBitmap(bmp, maxDimension = 1600, enhance = false)
                     localInput.outputStream().use { out -> scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out) }
                 } catch (e: Exception) {
                     contentResolver.openInputStream(uri)?.use { ins ->
@@ -143,10 +138,10 @@ class LlavaVisionActivity : AppCompatActivity() {
                     }
                 }
 
-                // OCR using LLMEdgeManager
+                // OCR using the vision client
                 val bmpForOcr = BitmapFactory.decodeFile(localInput.absolutePath)
                 val ocrText = try {
-                     LLMEdgeManager.extractText(this@LlavaVisionActivity, bmpForOcr)
+                    edge.vision.extractText(bmpForOcr)
                 } catch (e: Exception) {
                     Log.w(TAG, "OCR failed in local describe", e)
                     ""
@@ -207,12 +202,12 @@ class LlavaVisionActivity : AppCompatActivity() {
                 
                 // Load bitmap
                 val bmp = ImageUtils.imageToBitmap(this@LlavaVisionActivity, ImageSource.UriSource(uri))
-                val scaledBmp = ImageUtils.preprocessImage(bmp, correctOrientation = true, maxDimension = 1024, enhance = false)
+                val scaledBmp = ImageUtils.preprocessBitmap(bmp, maxDimension = 1024, enhance = false)
 
                 // 1. Run OCR
                 runOnUiThread { tvResult.text = "Running OCR..." }
                 val ocrText = try {
-                    LLMEdgeManager.extractText(this@LlavaVisionActivity, scaledBmp)
+                    edge.vision.extractText(scaledBmp)
                 } catch (e: Exception) {
                     Log.w(TAG, "OCR failed", e)
                     ""
@@ -223,33 +218,22 @@ class LlavaVisionActivity : AppCompatActivity() {
                 val height = scaledBmp.height
                 val dimsText = "${width}x${height}"
                 
-                // 3. Build Prompt (ChatML format for Phi-3)
-                val sb = StringBuilder()
-                sb.append("<|system|>\n")
-                sb.append("You are a helpful assistant.")
-                sb.append("<|end|>\n")
-                sb.append("<|user|>\n") // Start user message
-                sb.append("Context (image + OCR):\n")
-                sb.append("- Image size: $dimsText\n")
-                if (ocrText.isNotBlank()) {
-                    sb.append("- OCR: $ocrText\n")
+                // 3. Build a plain prompt and let the library/model template own the chat formatting.
+                val augmentedPrompt = buildString {
+                    appendLine("Describe the image using the prepared visual context.")
+                    appendLine("Return compact JSON with keys: objects, attributes, text.")
+                    appendLine("Image size: $dimsText")
+                    if (ocrText.isNotBlank()) {
+                        appendLine("OCR text: ${ocrText.take(1000)}")
+                    }
+                    appendLine()
+                    appendLine("User request: $promptText")
                 }
-                sb.append("\n")
-                sb.append("$promptText\n") // User's simple question
-                sb.append("<|end|>\n") // End user message
-                sb.append("<|assistant|>\n") // Start assistant message (for generation)
-
-                val augmentedPrompt = sb.toString()
 
                 // 4. Run Vision Analysis
                 runOnUiThread { tvResult.text = "Running vision analysis (loading model)..." }
                 
-                val params = LLMEdgeManager.VisionAnalysisParams(
-                    image = scaledBmp,
-                    prompt = augmentedPrompt
-                )
-                
-                val resultText = LLMEdgeManager.analyzeImage(this@LlavaVisionActivity, params)
+                val resultText = edge.vision.analyze(scaledBmp, augmentedPrompt)
 
                 runOnUiThread {
                     progress.visibility = View.GONE
@@ -277,9 +261,6 @@ class LlavaVisionActivity : AppCompatActivity() {
                     }
                     tvResult.text = pretty
                 }
-
-                // Print a performance snapshot to help debug generation speeds
-                LLMEdgeManager.logPerformanceSnapshot()
 
             } catch (e: Exception) {
                 Log.e(TAG, "Vision demo failed", e)

@@ -7,7 +7,7 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import io.aatricks.llmedge.LLMEdgeManager
+import io.aatricks.llmedge.LLMEdge
 
 /**
  * Main activity for LLMEdge Example app.
@@ -98,7 +98,7 @@ class MainActivity : AppCompatActivity() {
             sb.appendLine("Heap: ${heapUsed}MB / ${heapMax}MB")
 
             // Vulkan GPU info
-            val vulkanInfo = LLMEdgeManager.getVulkanDeviceInfo()
+            val vulkanInfo = LLMEdge.getVulkanDeviceInfo()
             if (vulkanInfo != null) {
                 sb.appendLine("GPU: ${vulkanInfo.freeMemoryMB}MB / ${vulkanInfo.totalMemoryMB}MB")
             } else {

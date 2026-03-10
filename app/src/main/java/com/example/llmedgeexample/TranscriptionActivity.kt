@@ -16,7 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.Whisper
+import io.aatricks.llmedge.speech.stt.Whisper
 import io.aatricks.llmedge.huggingface.HuggingFaceHub
 import java.io.File
 import kotlinx.coroutines.CancellationException

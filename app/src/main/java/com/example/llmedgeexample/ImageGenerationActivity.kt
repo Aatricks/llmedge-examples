@@ -13,7 +13,9 @@ import android.widget.Toast
 import android.widget.Switch
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.LLMEdgeManager
+import io.aatricks.llmedge.LLMEdge
+import io.aatricks.llmedge.image.diffusion.LoraApplyMode
+import io.aatricks.llmedge.image.ImageGenerationRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,7 +26,7 @@ import kotlinx.coroutines.withContext
  * Activity for image generation using MeinaMix SD 1.5 model.
  * 
  * Optimized for memory efficiency with:
- * - Proper model loading/unloading via LLMEdgeManager
+ * - Proper model loading/unloading via LLMEdge
  * - Memory state logging for debugging
  * - Graceful error handling for OOM
  */
@@ -56,13 +58,13 @@ class ImageGenerationActivity : AppCompatActivity() {
     private val loraToggle: Switch by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.loraToggle) }
 
     private var generationJob: Job? = null
+    private val edge by lazy(LazyThreadSafetyMode.NONE) {
+        bindEdge(this, this, lifecycleScope, preferPerformanceMode = true)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_image_generation) // Use image-specific layout
-
-        // Prefer performance mode during interactive examples to favor throughput (disable for memory-constrained devices)
-        io.aatricks.llmedge.LLMEdgeManager.preferPerformanceMode = true
 
         generateButton.text = "Generate Image"
 
@@ -135,7 +137,9 @@ class ImageGenerationActivity : AppCompatActivity() {
                                 updateProgressUI(0, "Downloading LoRA: $percent%")
                             }
                         )
-                        loraModelDir = result.file.parentFile.absolutePath
+                        loraModelDir = requireNotNull(result.file.parentFile) {
+                            "Downloaded LoRA file is missing a parent directory"
+                        }.absolutePath
                         val loraName = result.file.nameWithoutExtension
                         prompt += " <lora:$loraName:1.0>"
                     } catch (e: Exception) {
@@ -153,44 +157,34 @@ class ImageGenerationActivity : AppCompatActivity() {
 
                 val useFlashAttn = width >= 512 && height >= 512
 
-                val loraApplyMode = io.aatricks.llmedge.StableDiffusion.LoraApplyMode.AUTO
+                val loraApplyMode = LoraApplyMode.AUTO
 
-                val params = LLMEdgeManager.ImageGenerationParams(
+                val params = ImageGenerationRequest(
                     prompt = prompt,
                     width = width,
                     height = height,
                     steps = steps,
                     cfgScale = cfg,
                     seed = seed,
-                    flashAttn = useFlashAttn,
+                    flashAttention = useFlashAttn,
                     forceSequentialLoad = false,
                     loraModelDir = loraModelDir,
                     loraApplyMode = loraApplyMode
                 )
 
-                val bitmap = LLMEdgeManager.generateImage(
-                    context = applicationContext,
-                    params = params
-                ) { phase, current, total ->
-                    val status = if (total > 0) "$phase ($current/$total)" else phase
-                    updateProgressUI(0, status)
-                }
+                updateProgressUI(0, "Generating image...")
+                val bitmap = edge.image.generate(params)
 
                 // Log memory after generation
                 logMemoryState("After image generation")
 
-                if (bitmap != null) {
-                    withContext(Dispatchers.Main) {
-                        previewImage.setImageBitmap(bitmap)
-                    }
+                withContext(Dispatchers.Main) {
+                    previewImage.setImageBitmap(bitmap)
                 }
-
-                // Log performance information for easier debugging
-                LLMEdgeManager.logPerformanceSnapshot()
 
                 // Show metrics
                 // Show metrics in the dedicated metrics label and progress status
-                val metrics = LLMEdgeManager.getLastDiffusionMetrics()
+                val metrics = edge.image.getLastGenerationMetrics()
                 withContext(Dispatchers.Main) {
                     val metricsText = metrics?.let {
                         "Generated in ${String.format("%.1f", it.totalTimeSeconds)}s"
@@ -220,7 +214,7 @@ class ImageGenerationActivity : AppCompatActivity() {
 
     private fun cancelGeneration() {
         generationJob?.cancel()
-        LLMEdgeManager.cancelGeneration()
+        edge.image.cancelGeneration()
         updateProgressUI(0, "Cancelled")
     }
 
@@ -285,19 +279,16 @@ class ImageGenerationActivity : AppCompatActivity() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        when (level) {
-            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW,
-            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
-                android.util.Log.w(TAG, "System memory low (level=$level)")
-                if (generationJob?.isActive == true) {
-                    cancelGeneration()
-                    runOnUiThread {
-                        Toast.makeText(
-                            this,
-                            "Generation cancelled due to low memory",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+        if (TrimMemorySupport.isRunningLow(level)) {
+            android.util.Log.w(TAG, "System memory low (level=$level)")
+            if (generationJob?.isActive == true) {
+                cancelGeneration()
+                runOnUiThread {
+                    Toast.makeText(
+                        this,
+                        "Generation cancelled due to low memory",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }
@@ -331,7 +322,7 @@ class ImageGenerationActivity : AppCompatActivity() {
         android.util.Log.i(TAG, "  System: ${systemAvail}MB / ${systemTotal}MB total")
 
         // Log Vulkan memory if available
-        LLMEdgeManager.getVulkanDeviceInfo()?.let { vulkan ->
+        LLMEdge.getVulkanDeviceInfo()?.let { vulkan ->
             android.util.Log.i(TAG, "  Vulkan: ${vulkan.freeMemoryMB}MB / ${vulkan.totalMemoryMB}MB")
         }
     }

@@ -5,7 +5,10 @@ import android.content.Context
 import android.os.Debug
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import io.aatricks.llmedge.StableDiffusion
+import io.aatricks.llmedge.image.diffusion.StableDiffusion
+import io.aatricks.llmedge.image.diffusion.SampleMethod
+import io.aatricks.llmedge.image.diffusion.VideoGenerateParams
+import io.aatricks.llmedge.image.diffusion.txt2vid
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -153,7 +156,7 @@ class VideoGenerationRealE2ETest {
                 modelPath = modelFile.file.absolutePath,
                 vaePath = vaeFile.file.absolutePath,
                 t5xxlPath = t5xxlFile.file.absolutePath,
-                nThreads = io.aatricks.llmedge.CpuTopology.getOptimalThreadCount(io.aatricks.llmedge.CpuTopology.TaskType.DIFFUSION),
+                nThreads = io.aatricks.llmedge.runtime.CpuTopology.getOptimalThreadCount(io.aatricks.llmedge.runtime.CpuTopology.TaskType.DIFFUSION),
                 offloadToCpu = true,
                 keepClipOnCpu = true,
                 keepVaeOnCpu = true,
@@ -175,7 +178,7 @@ class VideoGenerationRealE2ETest {
             // Phase 7: Configure generation parameters
             android.util.Log.e(TAG, "")
             android.util.Log.e(TAG, "Phase 7: Preparing Generation Parameters")
-            val params = StableDiffusion.VideoGenerateParams(
+            val params = VideoGenerateParams(
                 prompt = "a cat walking in a garden, high quality",
                 videoFrames = 8,
                 width = 256,
@@ -183,7 +186,7 @@ class VideoGenerationRealE2ETest {
                 steps = 10,
                 cfgScale = 7.0f,
                 seed = 42,
-                sampleMethod = StableDiffusion.SampleMethod.EULER
+                sampleMethod = SampleMethod.EULER
             )
 
             logMemoryState("Before generation")
@@ -334,7 +337,7 @@ class VideoGenerationRealE2ETest {
             logMemoryState("After load")
 
             // Generate minimal video
-            val params = StableDiffusion.VideoGenerateParams(
+            val params = VideoGenerateParams(
                 prompt = "test",
                 videoFrames = 4, // Minimum frames
                 width = 256, // Minimum size
