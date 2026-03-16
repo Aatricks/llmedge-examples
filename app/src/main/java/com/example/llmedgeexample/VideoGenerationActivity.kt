@@ -532,6 +532,9 @@ class VideoGenerationActivity : AppCompatActivity() {
                     .show()
         }
 
+        // Prefer direct mode on capable devices; sequential mode is mainly for constrained memory.
+        val useSequentialLoad = isLowMem || availMemMB < 2500L
+
         updateProgressUI(0, "Preparing parameters...")
         generateButton.isEnabled = false
 
@@ -559,7 +562,6 @@ class VideoGenerationActivity : AppCompatActivity() {
                                 }
                         FileLogger.i(TAG, "Init image preparation done. hasInitImage=${resizedInitImage != null}")
 
-                        // Use sequential loading on low-memory devices (auto-detected)
                         // Width must be between 256-960 for Wan 2.1
                         FileLogger.i(TAG, "Constructing VideoGenerationRequest...")
                         val params =
@@ -573,8 +575,7 @@ class VideoGenerationActivity : AppCompatActivity() {
                                         seed = seed,
                                         flowShift = flowShift,
                                         flashAttention = true,
-                                        forceSequentialLoad =
-                                                true, // Always use sequential for safety
+                                        forceSequentialLoad = useSequentialLoad,
                                         sampleMethod = selectedSampleMethod,
                                         scheduler = selectedScheduler,
                                         loraModelDir = loraDir
@@ -593,6 +594,10 @@ class VideoGenerationActivity : AppCompatActivity() {
                                                 )
                                 )
                         FileLogger.i(TAG, "VideoGenerationRequest constructed.")
+                        FileLogger.i(
+                                TAG,
+                                "Generation mode: ${if (useSequentialLoad) "sequential" else "direct"} (isLowMem=$isLowMem, available=${availMemMB}MB)",
+                        )
 
                         if (resizedInitImage != null) {
                             FileLogger.i(
