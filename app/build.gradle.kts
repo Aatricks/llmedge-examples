@@ -70,10 +70,10 @@ dependencies {
     implementation("io.gitlab.shubham0204:sentence-embeddings:v6")
 
     // Hugging Face client dependencies (needed at runtime when using the library helper)
-    implementation("io.ktor:ktor-client-core:3.2.0")
-    implementation("io.ktor:ktor-client-okhttp:3.2.0")
-    implementation("io.ktor:ktor-client-content-negotiation:3.2.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.2.0")
+    implementation("io.ktor:ktor-client-core:2.3.12")
+    implementation("io.ktor:ktor-client-okhttp:2.3.12")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Android instrumented test dependencies
