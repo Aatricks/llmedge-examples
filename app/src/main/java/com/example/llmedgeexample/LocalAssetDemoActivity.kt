@@ -84,7 +84,7 @@ class LocalAssetDemoActivity : AppCompatActivity() {
                 // Blocking generation
                 val modelSpec = ModelSpec.localFile(modelPath)
                 val safeTextOptions = io.aatricks.llmedge.text.TextModelOptions(
-                    useVulkan = false,
+                    useVulkan = false, // Force CPU instead of OpenCL/Vulkan for this demo path.
                     useFlashAttention = false,
                 )
 

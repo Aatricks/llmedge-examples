@@ -134,7 +134,7 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                             systemPrompt = "You are a concise assistant running on-device.",
                             options =
                                 TextModelOptions(
-                                    useVulkan = false,
+                                    useVulkan = false, // Force CPU instead of OpenCL/Vulkan for this demo path.
                                     useFlashAttention = false,
                                     thinkingMode = thinkingMode,
                                     reasoningBudget = parsedReasoningBudget,

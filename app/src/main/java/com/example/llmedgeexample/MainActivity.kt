@@ -7,8 +7,6 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import io.aatricks.llmedge.LLMEdge
-
 /**
  * Main activity for LLMEdge Example app.
  *
@@ -97,12 +95,10 @@ class MainActivity : AppCompatActivity() {
             sb.appendLine("System: ${usedMB}MB / ${totalMB}MB (${availMB}MB free)")
             sb.appendLine("Heap: ${heapUsed}MB / ${heapMax}MB")
 
-            // Vulkan GPU info
-            val vulkanInfo = LLMEdge.getVulkanDeviceInfo()
-            if (vulkanInfo != null) {
-                sb.appendLine("GPU: ${vulkanInfo.freeMemoryMB}MB / ${vulkanInfo.totalMemoryMB}MB")
-            } else {
-                sb.appendLine("GPU: Not available")
+            val gpuStatus = detectGpuBackendStatus()
+            sb.appendLine("GPU backends: ${gpuStatus.summary()}")
+            gpuStatus.vulkanInfo?.let { vulkanInfo ->
+                sb.appendLine("Vulkan mem: ${vulkanInfo.freeMemoryMB}MB / ${vulkanInfo.totalMemoryMB}MB")
             }
 
             // Low memory warning

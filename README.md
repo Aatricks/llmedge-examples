@@ -82,13 +82,13 @@ This example application provides production-ready demonstrations of llmedge's c
 ## System Requirements
 
 ### Minimum Requirements
-- Android SDK 21+ (Lollipop)
+- Android 11+ (API 30)
 - 3GB RAM for basic LLM inference
 - 500MB free storage for model caching
 - 1GB+ free storage for speech models
 
 ### Recommended Configuration
-- Android 11+ (API 30) for Vulkan acceleration
+- Android 11+ (API 30) with GPU backends enabled
 - 8GB RAM for Stable Diffusion
 - 12GB+ RAM for video generation (Wan models)
 - 5GB free storage for video model pipeline
@@ -130,12 +130,13 @@ cd llmedge-examples
 ./gradlew :app:installDebug
 ```
 
-### Vulkan-Enabled Build
+### GPU-Enabled Build
 
-For GPU-accelerated inference on Android 11+ devices:
+For Android GPU builds with OpenCL-first, Vulkan-fallback runtime selection:
 
 ```bash
 ./gradlew :llmedge:assembleRelease \
+  -PllmedgeAndroidOpencl=ON \
   -Pandroid.jniCmakeArgs="-DGGML_VULKAN=ON -DSD_VULKAN=ON"
 
 cp llmedge/build/outputs/aar/llmedge-release.aar llmedge-examples/app/libs/llmedge-release.aar
@@ -144,7 +145,10 @@ cd llmedge-examples
 ./gradlew :app:assembleDebug :app:installDebug
 ```
 
-**Note**: Vulkan builds require devices with Vulkan 1.2 support (Android 11+).
+**Notes**:
+- Experimental OpenCL support is Android-only and currently limited to `arm64-v8a`.
+- At runtime, `llmedge` prefers OpenCL first, then Vulkan, then CPU for text, Whisper, and image/video.
+- Bark remains CPU-only.
 
 ## Asset Configuration
 
@@ -367,20 +371,20 @@ val params = SmolLM.InferenceParams(
 )
 ```
 
-### Vulkan Acceleration
+### GPU Backends
 
-Verify Vulkan availability:
+Verify Android GPU capability:
 ```kotlin
-if (SmolLM.isVulkanEnabled()) {
-    Log.i("Performance", "Vulkan backend active")
-} else {
-    Log.w("Performance", "Falling back to CPU backend")
+when {
+    LLMEdge.isOpenClAvailable() -> Log.i("Performance", "OpenCL backend available")
+    LLMEdge.isVulkanAvailable() -> Log.i("Performance", "Vulkan backend available")
+    else -> Log.w("Performance", "CPU backend only")
 }
 ```
 
 Check logcat for initialization:
 ```bash
-adb logcat -s SmolLM:* SmolSD:* | grep -i vulkan
+adb logcat -s SmolLM:* SmolSD:* | grep -Ei "opencl|vulkan|backend"
 ```
 
 ## Troubleshooting
@@ -413,7 +417,7 @@ adb logcat -s SmolLM:* SmolSD:* | grep -i vulkan
 **Solutions**:
 - Use quantized models (Q4_K_M, Q3_K_S)
 - Reduce inference steps (15-20 is usually sufficient)
-- Enable Vulkan on compatible devices
+- Enable Android GPU backends on compatible devices
 - Adjust thread count to match device cores
 - Use smaller resolutions for media generation
 

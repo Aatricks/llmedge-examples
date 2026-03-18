@@ -321,7 +321,9 @@ class ImageGenerationActivity : AppCompatActivity() {
         android.util.Log.i(TAG, "  Heap: ${heapUsed}MB / ${heapMax}MB max")
         android.util.Log.i(TAG, "  System: ${systemAvail}MB / ${systemTotal}MB total")
 
-        // Log Vulkan memory if available
+        if (isOpenClAvailableCompat()) {
+            android.util.Log.i(TAG, "  OpenCL: available")
+        }
         LLMEdge.getVulkanDeviceInfo()?.let { vulkan ->
             android.util.Log.i(TAG, "  Vulkan: ${vulkan.freeMemoryMB}MB / ${vulkan.totalMemoryMB}MB")
         }

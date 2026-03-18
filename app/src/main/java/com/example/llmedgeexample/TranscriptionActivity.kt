@@ -174,7 +174,7 @@ class TranscriptionActivity : AppCompatActivity() {
                 whisper =
                         Whisper.load(
                                 modelPath = modelPath,
-                                useGpu = false, // CPU for compatibility
+                                useGpu = false, // Force CPU for predictable behavior on all devices
                                 flashAttn = true
                         )
 

@@ -34,13 +34,18 @@ class LLMEdgeExampleApp : Application() {
         
         logMemoryState("Application started")
         
-        // Log Vulkan availability for debugging
-        val vulkanInfo = LLMEdge.getVulkanDeviceInfo()
-        if (vulkanInfo != null) {
-            FileLogger.i(TAG, "Vulkan available: ${vulkanInfo.deviceCount} device(s), " +
-                    "${vulkanInfo.freeMemoryMB}MB free / ${vulkanInfo.totalMemoryMB}MB total")
+        val gpuStatus = detectGpuBackendStatus()
+        if (gpuStatus.openClAvailable || gpuStatus.vulkanAvailable) {
+            FileLogger.i(TAG, "GPU backends available: ${gpuStatus.summary()}")
+            gpuStatus.vulkanInfo?.let { vulkanInfo ->
+                FileLogger.i(
+                    TAG,
+                    "Vulkan available: ${vulkanInfo.deviceCount} device(s), " +
+                        "${vulkanInfo.freeMemoryMB}MB free / ${vulkanInfo.totalMemoryMB}MB total",
+                )
+            }
         } else {
-            FileLogger.w(TAG, "Vulkan not available - GPU acceleration disabled")
+            FileLogger.w(TAG, "GPU backends unavailable - CPU fallback only")
         }
     }
 
@@ -89,7 +94,9 @@ class LLMEdgeExampleApp : Application() {
         FileLogger.i(TAG, "  System: ${systemAvail}MB available / ${systemTotal}MB total")
         FileLogger.i(TAG, "  Low memory: ${memoryInfo.lowMemory}")
         
-        // Log Vulkan memory if available
+        if (isOpenClAvailableCompat()) {
+            FileLogger.i(TAG, "  OpenCL: available")
+        }
         LLMEdge.getVulkanDeviceInfo()?.let { vulkan ->
             FileLogger.i(TAG, "  Vulkan: ${vulkan.freeMemoryMB}MB free / ${vulkan.totalMemoryMB}MB total")
         }

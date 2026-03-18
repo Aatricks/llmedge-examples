@@ -859,7 +859,9 @@ class VideoGenerationActivity : AppCompatActivity() {
         FileLogger.i(TAG, "  Heap: ${heapUsed}MB / ${heapMax}MB max")
         FileLogger.i(TAG, "  System: ${systemAvail}MB / ${systemTotal}MB total")
 
-        // Log Vulkan memory if available
+        if (isOpenClAvailableCompat()) {
+            FileLogger.i(TAG, "  OpenCL: available")
+        }
         LLMEdge.getVulkanDeviceInfo()?.let { vulkan ->
             FileLogger.i(TAG, "  Vulkan: ${vulkan.freeMemoryMB}MB / ${vulkan.totalMemoryMB}MB")
         }
