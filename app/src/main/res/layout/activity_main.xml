@@ -28,6 +28,14 @@
             android:paddingBottom="16dp"
             android:text="Loading memory info..." />
 
+        <Switch
+            android:id="@+id/switchForceCpuOnly"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Force CPU only"
+            android:textColor="@android:color/black"
+            android:paddingBottom="16dp" />
+
         <Button
             android:id="@+id/btnOpenLocal"
             android:layout_width="match_parent"

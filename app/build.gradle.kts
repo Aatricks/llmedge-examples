@@ -3,6 +3,16 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.0.0"
 }
 
+val localLlmEdgeAar = rootDir.parentFile.resolve("llmedge/build/outputs/aar/llmedge-release.aar")
+val bundledLlmEdgeAar = layout.projectDirectory.file("libs/llmedge-release.aar").asFile
+val syncLocalLlmEdgeAar by tasks.registering(Copy::class) {
+    description = "Sync the latest locally built llmedge AAR into the example app."
+    from(localLlmEdgeAar)
+    into(layout.projectDirectory.dir("libs"))
+    rename { "llmedge-release.aar" }
+    onlyIf { localLlmEdgeAar.exists() }
+}
+
 // Note: we depend on ML Kit text-recognition at runtime. Avoid referencing
 // coordinates that may not be available in the example app's repositories.
 
@@ -44,9 +54,13 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 
+tasks.named("preBuild").configure {
+    dependsOn(syncLocalLlmEdgeAar)
+}
+
 dependencies {
     // Use the bundled AAR placed in this app's libs/ directory (avoids AGP artifact extraction issues)
-    implementation(files("libs/llmedge-release.aar"))
+    implementation(files(bundledLlmEdgeAar))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     // Provides TasksKt.await extension used when awaiting Task<T> from ML Kit

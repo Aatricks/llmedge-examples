@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
+import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 /**
@@ -30,6 +31,13 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // Navigation buttons
+        val forceCpuOnlySwitch = findViewById<Switch>(R.id.switchForceCpuOnly)
+        forceCpuOnlySwitch.isChecked = isCpuOnlyForced(this)
+        forceCpuOnlySwitch.setOnCheckedChangeListener { _, isChecked ->
+            setCpuOnlyForced(this, isChecked)
+            updateMemoryInfo()
+        }
+
         findViewById<Button>(R.id.btnOpenLocal).setOnClickListener {
             startActivity(Intent(this, LocalAssetDemoActivity::class.java))
         }
@@ -97,6 +105,7 @@ class MainActivity : AppCompatActivity() {
 
             val gpuStatus = detectGpuBackendStatus()
             sb.appendLine("GPU backends: ${gpuStatus.summary()}")
+            sb.appendLine("CPU-only override: ${if (isCpuOnlyForced(this)) "ON" else "OFF"}")
             gpuStatus.vulkanInfo?.let { vulkanInfo ->
                 sb.appendLine("Vulkan mem: ${vulkanInfo.freeMemoryMB}MB / ${vulkanInfo.totalMemoryMB}MB")
             }

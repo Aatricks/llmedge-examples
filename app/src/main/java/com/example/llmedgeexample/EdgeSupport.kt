@@ -8,6 +8,9 @@ import io.aatricks.llmedge.VulkanDeviceInfo
 import io.aatricks.llmedge.lifecycle.LLMEdgeLifecycle
 import kotlinx.coroutines.CoroutineScope
 
+private const val EDGE_PREFS_NAME = "llmedge_example_prefs"
+private const val PREF_FORCE_CPU_ONLY = "force_cpu_only"
+
 fun bindEdge(
     owner: LifecycleOwner,
     context: Context,
@@ -19,9 +22,28 @@ fun bindEdge(
         LLMEdge.create(
             context = context,
             scope = scope,
-            config = LLMEdgeConfig(preferPerformanceMode = preferPerformanceMode),
+            config =
+                LLMEdgeConfig(
+                    preferPerformanceMode = preferPerformanceMode && !isCpuOnlyForced(context),
+                    textUseVulkan = !isCpuOnlyForced(context),
+                ),
         ),
     )
+
+fun isCpuOnlyForced(context: Context): Boolean =
+    context
+        .applicationContext
+        .getSharedPreferences(EDGE_PREFS_NAME, Context.MODE_PRIVATE)
+        .getBoolean(PREF_FORCE_CPU_ONLY, false)
+
+fun setCpuOnlyForced(context: Context, enabled: Boolean) {
+    context
+        .applicationContext
+        .getSharedPreferences(EDGE_PREFS_NAME, Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean(PREF_FORCE_CPU_ONLY, enabled)
+        .apply()
+}
 
 fun isOpenClAvailableCompat(): Boolean =
     runCatching {
