@@ -46,6 +46,9 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
+            android:name=".ToolCallingDemoActivity"
+            android:exported="false" />
+        <activity
             android:name=".HeadlessVideoTestActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"

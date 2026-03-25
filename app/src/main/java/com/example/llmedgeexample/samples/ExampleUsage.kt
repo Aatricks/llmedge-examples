@@ -1,45 +1,36 @@
 package com.example.llmedgeexample.samples
 
 import android.content.Context
-import io.aatricks.llmedge.text.runtime.SmolLM
+import io.aatricks.llmedge.LLMEdge
+import io.aatricks.llmedge.text.TextModelOptions
 import io.aatricks.llmedge.tools.DeviceToolFactory
-import io.aatricks.llmedge.tools.LLMAgent
+import io.aatricks.llmedge.tools.ToolAgent
+import io.aatricks.llmedge.tools.ToolPolicies
 import kotlinx.coroutines.runBlocking
 
 /**
- * Example usage of the LLMAgent with real-world device tools.
+ * Example usage of the supported ToolAgent API with real-world device tools.
  */
 object ExampleUsage {
 
-    /**
-     * Demonstrates how to initialize the agent with real-world device tools.
-     * Note: In a real Android app, this would be called from a ViewModel or Activity
-     * where the 'context' and 'smolLM' are available.
-     */
-    fun setupAgent(context: Context, smolLM: SmolLM): LLMAgent {
-        // 1. Initialize the DeviceToolFactory
+    fun setupAgent(
+        context: Context,
+        edge: LLMEdge,
+    ): ToolAgent {
         val factory = DeviceToolFactory(context)
-        
-        // 2. Create the list of real tools
-        val tools = listOf(
-            factory.createGetTimeTool(),
-            factory.createGetBatteryStatusTool(),
-            factory.createGetDeviceInfoTool(),
-            factory.createOpenBrowserTool()
+        return edge.text.toolAgent(
+            tools = factory.createDefaultTools(),
+            options = TextModelOptions(useVulkan = false),
+            policy = ToolPolicies.ALLOW_ALL,
         )
-
-        // 3. Create the agent with the SmolLM instance and tools
-        return LLMAgent(smolLM, tools)
     }
 
-    // Example of running the agent
-    fun runExample(context: Context, smolLM: SmolLM) = runBlocking {
-        val agent = setupAgent(context, smolLM)
-        
-        // The LLM can now answer questions like:
-        // "What time is it and how much battery do I have left?"
-        // "Open google.com for me"
-        val response = agent.chat("What's my current battery level?")
-        println("Agent Response: $response")
+    fun runExample(
+        context: Context,
+        edge: LLMEdge,
+    ) = runBlocking {
+        val agent = setupAgent(context, edge)
+        val response = agent.reply("What's my current battery level?")
+        println("Agent Response: ${response.text}")
     }
 }

@@ -66,6 +66,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ImageGenerationActivity::class.java))
         }
 
+        findViewById<Button>(R.id.btnOpenToolCalling).setOnClickListener {
+            startActivity(Intent(this, ToolCallingDemoActivity::class.java))
+        }
+
         findViewById<Button>(R.id.btnOpenTranscription).setOnClickListener {
             startActivity(Intent(this, TranscriptionActivity::class.java))
         }

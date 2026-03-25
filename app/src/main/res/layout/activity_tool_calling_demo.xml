@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tool Calling Demo"
+            android:textColor="@android:color/black"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Downloads a GGUF instruct model, creates a ToolAgent with built-in device tools, and streams tool events plus the final answer."
+            android:textColor="@android:color/darker_gray" />
+
+        <EditText
+            android:id="@+id/inputToolModelId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:hint="Model repo"
+            android:singleLine="true"
+            android:text="unsloth/Qwen3-0.6B-GGUF" />
+
+        <EditText
+            android:id="@+id/inputToolFilename"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="GGUF filename"
+            android:singleLine="true"
+            android:text="Qwen3-0.6B-Q4_K_M.gguf" />
+
+        <EditText
+            android:id="@+id/inputToolPrompt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="top|start"
+            android:hint="Ask the tool agent to use time, battery, device info, or open_browser."
+            android:inputType="textMultiLine"
+            android:minLines="4"
+            android:text="What time is it and how much battery is left? If action tools are enabled and the battery is above 20%, open https://developer.android.com in the browser." />
+
+        <Switch
+            android:id="@+id/switchAllowActionTools"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Allow action tools (open browser)"
+            android:textColor="@android:color/black" />
+
+        <Button
+            android:id="@+id/btnRunToolAgent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Run Tool Agent" />
+
+        <TextView
+            android:id="@+id/textToolStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Idle"
+            android:textColor="@android:color/black"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Tool events"
+            android:textColor="@android:color/black"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/textToolEvents"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#FFF3F3F3"
+            android:fontFamily="monospace"
+            android:padding="12dp"
+            android:text="No events yet."
+            android:textColor="@android:color/black"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Assistant response"
+            android:textColor="@android:color/black"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/textToolResponse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#FFF7F7F7"
+            android:padding="12dp"
+            android:textColor="@android:color/black"
+            android:textSize="16sp" />
+
+    </LinearLayout>
+</ScrollView>
