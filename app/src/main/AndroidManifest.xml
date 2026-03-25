@@ -31,6 +31,10 @@
             android:name=".LocalAssetDemoActivity"
             android:exported="false"
         />
+        <activity
+            android:name=".JinjaTemplateDemoActivity"
+            android:exported="false"
+        />
         <activity android:name=".RagActivity" android:exported="false" />
         <activity
             android:name=".ImageToTextActivity"

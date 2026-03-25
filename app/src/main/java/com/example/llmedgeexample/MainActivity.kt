@@ -42,6 +42,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, LocalAssetDemoActivity::class.java))
         }
 
+        findViewById<Button>(R.id.btnOpenJinjaTemplate).setOnClickListener {
+            startActivity(Intent(this, JinjaTemplateDemoActivity::class.java))
+        }
+
         findViewById<Button>(R.id.btnOpenHuggingFace).setOnClickListener {
             startActivity(Intent(this, HuggingFaceDemoActivity::class.java))
         }

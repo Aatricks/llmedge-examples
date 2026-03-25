@@ -18,6 +18,11 @@ This example application provides production-ready demonstrations of llmedge's c
 - Shows both blocking and streaming inference patterns
 - Suitable for offline-first applications
 
+**Jinja Chat Template Demo** (`JinjaTemplateDemoActivity.kt`)
+- Demonstrates passing an explicit loop-based Jinja chat template through `SmolLM.InferenceParams.chatTemplate`
+- Downloads a GGUF model from Hugging Face through `SmolLM.loadFromHuggingFace(...)`
+- Shows the exact template string used for the request so the override path is visible in-app
+
 **Hugging Face Demo** (`HuggingFaceDemoActivity.kt`)
 - Automated model download from Hugging Face Hub
 - Progress monitoring and cache management
