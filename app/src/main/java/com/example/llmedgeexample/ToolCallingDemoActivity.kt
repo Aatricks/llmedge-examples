@@ -12,27 +12,21 @@ import io.aatricks.llmedge.model.ModelSpec
 import io.aatricks.llmedge.text.TextModelOptions
 import io.aatricks.llmedge.text.runtime.SmolLM
 import io.aatricks.llmedge.tools.DeviceToolFactory
-import io.aatricks.llmedge.tools.ToolAgentEvent
-import io.aatricks.llmedge.tools.ToolDecision
-import io.aatricks.llmedge.tools.ToolKind
-import io.aatricks.llmedge.tools.ToolPolicy
+import io.aatricks.llmedge.tools.ToolResult
 import java.util.Locale
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
- * Activity demonstrating structured tool calling through `edge.text.toolAgent(...)`.
- *
- * The demo downloads a user-selected GGUF model, creates a ToolAgent with built-in device tools,
- * streams tool events, and optionally allows action tools like `open_browser`.
+ * Activity demonstrating deterministic device-tool orchestration for small LLMs.
  */
 class ToolCallingDemoActivity : AppCompatActivity() {
     private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, lifecycleScope) }
-    private val json by lazy(LazyThreadSafetyMode.NONE) { Json { prettyPrint = false } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,6 +73,12 @@ class ToolCallingDemoActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 try {
                     val modelSpec = ModelSpec.huggingFace(repoId = modelId, filename = filename)
+                    val modelOptions =
+                        TextModelOptions(
+                            temperature = 0.0f,
+                            thinkingMode = SmolLM.ThinkingMode.DISABLED,
+                            reasoningBudget = 0,
+                        )
                     val modelFile =
                         edge.models.prefetch(modelSpec) { progress ->
                             val downloadedMb = progress.downloadedBytes / (1024.0 * 1024.0)
@@ -99,86 +99,74 @@ class ToolCallingDemoActivity : AppCompatActivity() {
                             }
                         }
 
-                    val tools = DeviceToolFactory(this@ToolCallingDemoActivity).createDefaultTools()
+                    val localModel = ModelSpec.localFile(modelFile)
+                    val toolFactory = DeviceToolFactory(this@ToolCallingDemoActivity)
                     val allowActions = switchAllowActions.isChecked
-                    val agent =
-                        edge.text.toolAgent(
-                            tools = tools,
-                            model = ModelSpec.localFile(modelFile),
-                            systemPrompt = "You are a concise Android assistant. Use tools only when they directly help.",
-                            options =
-                                TextModelOptions(
-                                    temperature = 0.0f,
-                                    thinkingMode = SmolLM.ThinkingMode.DEFAULT,
-                                ),
-                            policy =
-                                ToolPolicy { request ->
-                                    if (request.tool.kind == ToolKind.READ_ONLY || allowActions) {
-                                        ToolDecision.Allow
-                                    } else {
-                                        ToolDecision.Deny("Enable 'Allow action tools' to run ${request.tool.name}.")
-                                    }
-                                },
-                        )
+                    val intent = ToolCallingDemoPlanner.analyze(prompt)
 
-                    withContext(Dispatchers.Main) {
-                        textStatus.text = "Model ready at ${modelFile.name}. Running tool agent..."
-                    }
+                    textStatus.text =
+                        if (intent.needsDeterministicTools) {
+                            "Model ready at ${modelFile.name}. Running deterministic tool step..."
+                        } else {
+                            "Model ready at ${modelFile.name}. Generating direct response..."
+                        }
+                    val finishLabel =
+                        if (intent.needsDeterministicTools) {
+                            "Finished: deterministic tool synthesis"
+                        } else {
+                            "Finished: direct response"
+                        }
 
-                    agent.stream(prompt).collect { event ->
-                        when (event) {
-                            is ToolAgentEvent.Started -> {
-                                textStatus.text = "Running tool agent..."
-                                appendEvent(textEvents, "Started: ${event.message}")
-                            }
-
-                            is ToolAgentEvent.ToolCallRequested -> {
+                    val finalResponse =
+                        if (intent.needsDeterministicTools) {
+                            appendEvent(textEvents, "Started: $prompt")
+                            appendEvent(textEvents, "Deterministic plan: ${describeIntent(intent)}")
+                            val snapshot = executeDeterministicPlan(toolFactory, intent, allowActions, textEvents)
+                            textStatus.text = "Generating final answer from tool results..."
+                            val generated =
+                                edge.text.generate(
+                                    prompt = ToolCallingDemoPlanner.buildSynthesisPrompt(prompt, snapshot),
+                                    model = localModel,
+                                    systemPrompt =
+                                        "You are a concise Android assistant. Answer using only verified tool results.",
+                                    options = modelOptions,
+                                ).trim()
+                            if (ToolCallingDemoPlanner.shouldUseFallback(generated, intent, snapshot)) {
                                 appendEvent(
                                     textEvents,
-                                    "Tool requested: ${event.call.tool} ${formatJson(event.call.arguments)}",
+                                    "Using deterministic fallback response because the model answer did not match the verified tool results.",
                                 )
+                                ToolCallingDemoPlanner.buildFallbackResponse(snapshot)
+                            } else {
+                                generated
                             }
+                        } else {
+                            appendEvent(textEvents, "Started: $prompt")
+                            edge.text.generate(
+                                prompt = prompt,
+                                model = localModel,
+                                systemPrompt =
+                                    "You are a concise Android assistant. Reply in plain text only.",
+                                options = modelOptions,
+                            ).trim()
+                        }
 
-                            is ToolAgentEvent.ToolApproved ->
-                                appendEvent(textEvents, "Tool approved: ${event.call.tool}")
-
-                            is ToolAgentEvent.ToolDenied ->
-                                appendEvent(textEvents, "Tool denied: ${event.call.tool} (${event.reason})")
-
-                            is ToolAgentEvent.ToolExecuting ->
-                                appendEvent(textEvents, "Executing: ${event.call.tool}")
-
-                            is ToolAgentEvent.ToolResultReceived ->
-                                appendEvent(
-                                    textEvents,
-                                    "Tool result: ${event.call.tool} -> ${event.result.text}",
+                    textResponse.text =
+                        finalResponse.ifBlank {
+                            "No user-visible final answer was produced. Check the verified tool results above."
+                        }
+                    val metrics = edge.text.getLastGenerationMetrics()
+                    textStatus.text =
+                        buildString {
+                            append(finishLabel)
+                            metrics?.let {
+                                append(
+                                    " | ${it.tokenCount} tokens @ ${
+                                        String.format(Locale.US, "%.2f", it.tokensPerSecond)
+                                    } tok/s",
                                 )
-
-                            is ToolAgentEvent.TextChunk -> {
-                                textResponse.append(event.value)
-                            }
-
-                            is ToolAgentEvent.Completed -> {
-                                val metrics = edge.text.getLastGenerationMetrics()
-                                textStatus.text =
-                                    buildString {
-                                        append("Finished: ${event.result.finishReason}")
-                                        metrics?.let {
-                                            append(
-                                                " | ${it.tokenCount} tokens @ ${
-                                                    String.format(Locale.US, "%.2f", it.tokensPerSecond)
-                                                } tok/s",
-                                            )
-                                        }
-                                    }
-                            }
-
-                            is ToolAgentEvent.Failed -> {
-                                textStatus.text = "Failed: ${event.message}"
-                                appendEvent(textEvents, "Failed: ${event.message}")
                             }
                         }
-                    }
                 } catch (t: Throwable) {
                     textStatus.text = "Failed: ${t.message}"
                     appendEvent(textEvents, "Error: ${t.message}")
@@ -209,7 +197,102 @@ class ToolCallingDemoActivity : AppCompatActivity() {
             }
     }
 
-    private fun formatJson(value: JsonObject): String = json.encodeToString(JsonObject.serializer(), value)
+    private suspend fun executeDeterministicPlan(
+        toolFactory: DeviceToolFactory,
+        intent: DeviceToolDemoIntent,
+        allowActions: Boolean,
+        textEvents: TextView,
+    ): DeterministicToolSnapshot {
+        var timeText: String? = null
+        var timestamp: String? = null
+        var batteryText: String? = null
+        var batteryPercent: Int? = null
+        var isCharging: Boolean? = null
+        var browserStatus: BrowserActionStatus = BrowserActionStatus.NotRequested
+
+        if (intent.wantsCurrentTime) {
+            val result = runTool(toolFactory.createGetTimeTool().name, textEvents) {
+                toolFactory.createGetTimeTool().handler(buildJsonObject { })
+            }
+            timeText = result.text
+            timestamp = result.data["timestamp"]?.jsonPrimitive?.contentOrNull
+        }
+
+        if (intent.wantsBatteryStatus) {
+            val result = runTool(toolFactory.createGetBatteryStatusTool().name, textEvents) {
+                toolFactory.createGetBatteryStatusTool().handler(buildJsonObject { })
+            }
+            batteryText = result.text
+            batteryPercent = result.data["batteryPercent"]?.jsonPrimitive?.intOrNull
+            isCharging = result.data["isCharging"]?.jsonPrimitive?.booleanOrNull
+            appendEvent(
+                textEvents,
+                "Structured battery values: batteryPercent=${batteryPercent ?: "unavailable"}, isCharging=${isCharging ?: "unavailable"}",
+            )
+        }
+
+        when (val decision = ToolCallingDemoPlanner.decideBrowserAction(intent, allowActions, batteryPercent)) {
+            BrowserActionDecision.NotRequested -> Unit
+
+            is BrowserActionDecision.Execute -> {
+                val result =
+                    runTool(toolFactory.createOpenBrowserTool().name, textEvents) {
+                        toolFactory.createOpenBrowserTool().handler(
+                            buildJsonObject {
+                                put("url", decision.url)
+                            },
+                        )
+                    }
+                browserStatus =
+                    if (result.isError) {
+                        BrowserActionStatus.Failed(decision.url, result.text)
+                    } else {
+                        BrowserActionStatus.Executed(decision.url, result.text)
+                    }
+            }
+
+            is BrowserActionDecision.Skip -> {
+                browserStatus = BrowserActionStatus.Skipped(decision.url, decision.reason)
+                appendEvent(textEvents, "Browser action skipped for ${decision.url}: ${decision.reason}")
+            }
+        }
+
+        return DeterministicToolSnapshot(
+            timeText = timeText,
+            timestamp = timestamp,
+            batteryText = batteryText,
+            batteryPercent = batteryPercent,
+            isCharging = isCharging,
+            browserStatus = browserStatus,
+        )
+    }
+
+    private suspend fun runTool(
+        toolName: String,
+        textEvents: TextView,
+        execute: suspend () -> ToolResult,
+    ): ToolResult {
+        appendEvent(textEvents, "Deterministic tool requested: $toolName {}")
+        appendEvent(textEvents, "Executing: $toolName")
+        val result = execute()
+        appendEvent(textEvents, "Tool result: $toolName -> ${result.text}")
+        return result
+    }
+
+    private fun describeIntent(intent: DeviceToolDemoIntent): String =
+        buildList {
+            if (intent.wantsCurrentTime) {
+                add("time")
+            }
+            if (intent.wantsBatteryStatus) {
+                add("battery")
+            }
+            intent.browserUrl?.let { url ->
+                val threshold =
+                    intent.batteryThresholdPercent?.let { percent -> ", threshold>${percent}%" }.orEmpty()
+                add("browser(url=$url$threshold)")
+            }
+        }.ifEmpty { listOf("no device tools detected") }.joinToString(", ")
 
     private fun isUiActive(): Boolean =
         lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&

@@ -21,7 +21,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Downloads a GGUF instruct model, creates a ToolAgent with built-in device tools, and streams tool events plus the final answer."
+            android:text="Downloads a GGUF instruct model, creates a ToolAgent with built-in device tools, runs read-only tools normally, and only allows action tools when the switch is enabled. Zero-argument tools like time and battery should be called with empty arguments."
             android:textColor="@android:color/darker_gray" />
 
         <EditText
