@@ -5,6 +5,7 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import io.aatricks.llmedge.runtime.CpuTopology
 import io.aatricks.llmedge.text.runtime.SmolLM
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,6 +20,7 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
         private const val MODEL_REVISION = "main"
         private const val MODEL_FILENAME = "Qwen3-0.6B-Q4_K_M.gguf"
         private const val PROMPT = "Explain in one short sentence why this demo uses a custom chat template."
+        private const val BACKEND_LABEL = "CPU"
         private val JINJA_CHAT_TEMPLATE =
             """
             {%- for message in messages -%}
@@ -28,6 +30,11 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
             {{- '<|im_start|>assistant\n' -}}
             {%- endif -%}
             """.trimIndent()
+        private val PROMPT_THREADS =
+            CpuTopology.getOptimalThreadCount(CpuTopology.TaskType.PROMPT_PROCESSING)
+        private val GENERATION_THREADS =
+            CpuTopology.getOptimalThreadCount(CpuTopology.TaskType.TOKEN_GENERATION)
+        private const val FLASH_ATTN_ENABLED = false
     }
 
     private var smol: SmolLM? = null
@@ -45,9 +52,16 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
         output.text =
             buildString {
                 appendLine("This demo loads SmolLM with an explicit loop-based Jinja chat template override.")
+                appendLine("It intentionally uses the same CPU-oriented baseline as the Hugging Face demo so the template path is the main variable.")
                 appendLine()
                 appendLine("Model source:")
                 appendLine("$MODEL_ID ($MODEL_FILENAME @ $MODEL_REVISION)")
+                appendLine()
+                appendLine("Runtime config:")
+                appendLine("Backend: $BACKEND_LABEL")
+                appendLine("Prompt threads: $PROMPT_THREADS")
+                appendLine("Generation threads: $GENERATION_THREADS")
+                appendLine("Flash attention: $FLASH_ATTN_ENABLED")
                 appendLine()
                 appendLine("Template:")
                 appendLine(JINJA_CHAT_TEMPLATE)
@@ -63,6 +77,13 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
                     output.text =
                         buildString {
                             appendLine("Preparing Jinja template demo...")
+                            appendLine("Using the same CPU baseline as the Hugging Face demo for a fair comparison.")
+                            appendLine()
+                            appendLine("Runtime config:")
+                            appendLine("Backend: $BACKEND_LABEL")
+                            appendLine("Prompt threads: $PROMPT_THREADS")
+                            appendLine("Generation threads: $GENERATION_THREADS")
+                            appendLine("Flash attention: $FLASH_ATTN_ENABLED")
                             appendLine()
                             appendLine("Downloading model from Hugging Face if needed:")
                             appendLine("$MODEL_ID ($MODEL_FILENAME @ $MODEL_REVISION)")
@@ -74,7 +95,7 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
 
                     try {
                         smol?.close()
-                        smol = SmolLM(useVulkan = !isCpuOnlyForced(this@JinjaTemplateDemoActivity))
+                        smol = SmolLM(useVulkan = false)
 
                         val downloadResult =
                             withContext(Dispatchers.IO) {
@@ -86,14 +107,22 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
                                     params =
                                         SmolLM.InferenceParams(
                                             chatTemplate = JINJA_CHAT_TEMPLATE,
-                                            useFlashAttn = false,
-                                            numThreads = 4,
+                                            useFlashAttn = FLASH_ATTN_ENABLED,
+                                            numThreads = PROMPT_THREADS,
+                                            generationThreads = GENERATION_THREADS,
                                         ),
                                     onProgress = { downloaded, total ->
                                         runOnUiThread {
                                             output.text =
                                                 buildString {
                                                     appendLine("Preparing Jinja template demo...")
+                                                    appendLine("Using the same CPU baseline as the Hugging Face demo for a fair comparison.")
+                                                    appendLine()
+                                                    appendLine("Runtime config:")
+                                                    appendLine("Backend: $BACKEND_LABEL")
+                                                    appendLine("Prompt threads: $PROMPT_THREADS")
+                                                    appendLine("Generation threads: $GENERATION_THREADS")
+                                                    appendLine("Flash attention: $FLASH_ATTN_ENABLED")
                                                     appendLine()
                                                     appendLine("Download:")
                                                     appendLine(formatProgress(downloaded, total))
@@ -126,7 +155,10 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
                                 appendLine("Jinja template override loaded successfully.")
                                 appendLine("Model: ${downloadResult.file.absolutePath}")
                                 appendLine("Downloaded from: $MODEL_ID")
-                                appendLine("GPU enabled: ${!isCpuOnlyForced(this@JinjaTemplateDemoActivity)}")
+                                appendLine("Backend: $BACKEND_LABEL")
+                                appendLine("Prompt threads: $PROMPT_THREADS")
+                                appendLine("Generation threads: $GENERATION_THREADS")
+                                appendLine("Flash attention: $FLASH_ATTN_ENABLED")
                                 appendLine()
                                 appendLine("Template:")
                                 appendLine(JINJA_CHAT_TEMPLATE)
