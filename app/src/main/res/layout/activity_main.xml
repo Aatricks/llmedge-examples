@@ -43,6 +43,13 @@
             android:text="Local GGUF Asset Demo" />
 
         <Button
+            android:id="@+id/btnOpenJinjaTemplate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Jinja Chat Template Demo" />
+
+        <Button
             android:id="@+id/btnOpenHuggingFace"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -83,6 +90,13 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="Image Generation" />
+
+        <Button
+            android:id="@+id/btnOpenToolCalling"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Tool Calling Demo" />
 
         <Button
             android:id="@+id/btnOpenTranscription"

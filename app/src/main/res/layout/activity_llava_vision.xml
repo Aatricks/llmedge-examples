@@ -33,6 +33,14 @@
         android:layout_marginTop="12dp"
         android:hint="Enter a question or 'Describe the image'" />
 
+    <Switch
+        android:id="@+id/switchOcrAssist"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:checked="false"
+        android:text="OCR assist" />
+
     <Button
         android:id="@+id/btnRun"
         android:layout_width="match_parent"

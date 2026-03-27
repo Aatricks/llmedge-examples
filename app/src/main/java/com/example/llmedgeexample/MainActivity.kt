@@ -42,6 +42,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, LocalAssetDemoActivity::class.java))
         }
 
+        findViewById<Button>(R.id.btnOpenJinjaTemplate).setOnClickListener {
+            startActivity(Intent(this, JinjaTemplateDemoActivity::class.java))
+        }
+
         findViewById<Button>(R.id.btnOpenHuggingFace).setOnClickListener {
             startActivity(Intent(this, HuggingFaceDemoActivity::class.java))
         }
@@ -64,6 +68,10 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnOpenImageGeneration).setOnClickListener {
             startActivity(Intent(this, ImageGenerationActivity::class.java))
+        }
+
+        findViewById<Button>(R.id.btnOpenToolCalling).setOnClickListener {
+            startActivity(Intent(this, ToolCallingDemoActivity::class.java))
         }
 
         findViewById<Button>(R.id.btnOpenTranscription).setOnClickListener {
