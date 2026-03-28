@@ -13,11 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
 import io.aatricks.llmedge.image.ImageGenerationRequest
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import io.aatricks.llmedge.image.diffusion.GenerationMetrics
 
 /**
  * Activity for image generation using MeinaMix SD 1.5 model.
@@ -53,9 +49,15 @@ class ImageGenerationActivity : AppCompatActivity() {
     private val metricsLabel: TextView by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.videoMetricsLabel) }
     private val loraToggle: Switch by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.loraToggle) }
 
-    private var generationJob: Job? = null
     private val edge by lazy(LazyThreadSafetyMode.NONE) {
         bindEdge(this, this, lifecycleScope, preferPerformanceMode = true)
+    }
+    private val controller by lazy(LazyThreadSafetyMode.NONE) {
+        ImageGenerationController(
+            scope = lifecycleScope,
+            runtime = EdgeImageGenerationRuntime(edge),
+            tag = TAG,
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,7 +87,7 @@ class ImageGenerationActivity : AppCompatActivity() {
     }
 
     private fun startGeneration() {
-        if (generationJob?.isActive == true) {
+        if (controller.isGenerating()) {
             Toast.makeText(this, "Generation already running", Toast.LENGTH_SHORT).show()
             return
         }
@@ -112,106 +114,89 @@ class ImageGenerationActivity : AppCompatActivity() {
         progressBar.visibility = View.VISIBLE
         progressBar.isIndeterminate = true
         generateButton.isEnabled = false
+        val prompt = promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
+        val loraRequested = loraToggle.isChecked
 
-        // Use Dispatchers.IO for native JNI operations - it has more threads for blocking operations
-        // Dispatchers.Default is CPU-bound and has limited parallelism (core count)
-        generationJob = lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                var prompt = promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
-                var loraModelDir: String? = null
-                
-                if (loraToggle.isChecked) {
-                    updateProgressUI(0, "Checking LoRA model...")
-                    try {
-                        val result = io.aatricks.llmedge.huggingface.HuggingFaceHub.ensureRepoFileOnDisk(
-                            context = applicationContext,
-                            modelId = "imagepipeline/Detail-Tweaker-LoRA-SD1.5",
-                            filename = null, // Auto-detect largest safetensors
-                            preferSystemDownloader = true,
-                            onProgress = { downloaded, total ->
-                                val percent = if (total != null && total > 0) (downloaded * 100 / total).toInt() else 0
-                                updateProgressUI(0, "Downloading LoRA: $percent%")
-                            }
-                        )
-                        loraModelDir = requireNotNull(result.file.parentFile) {
-                            "Downloaded LoRA file is missing a parent directory"
-                        }.absolutePath
-                        val loraName = result.file.nameWithoutExtension
-                        prompt += " <lora:$loraName:1.0>"
-                    } catch (e: Exception) {
-                        android.util.Log.e(TAG, "Failed to download LoRA", e)
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@ImageGenerationActivity, "Failed to download LoRA: ${e.message}", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
-                
-                // Log memory before generation
-                logDemoMemoryState(TAG, "Before image generation", includeGpu = true)
-
-                updateProgressUI(0, "Preparing...")
-
-                val useFlashAttn = width >= 512 && height >= 512
-
-                val loraApplyMode = LoraApplyMode.AUTO
-
-                val params = ImageGenerationRequest(
-                    prompt = prompt,
-                    width = width,
-                    height = height,
-                    steps = steps,
-                    cfgScale = cfg,
-                    seed = seed,
-                    flashAttention = useFlashAttn,
-                    forceSequentialLoad = false,
-                    loraModelDir = loraModelDir,
-                    loraApplyMode = loraApplyMode
-                )
-
-                updateProgressUI(0, "Generating image...")
-                val bitmap = edge.image.generate(params)
-
-                // Log memory after generation
-                logDemoMemoryState(TAG, "After image generation", includeGpu = true)
-
-                withContext(Dispatchers.Main) {
-                    previewImage.setImageBitmap(bitmap)
-                }
-
-                // Show metrics
-                // Show metrics in the dedicated metrics label and progress status
-                val metrics = edge.image.getLastGenerationMetrics()
-                withContext(Dispatchers.Main) {
-                    val metricsText = metrics?.let {
-                        "Generated in ${String.format("%.1f", it.totalTimeSeconds)}s"
-                    } ?: ""
-                    metricsLabel.text = metricsText.ifBlank { "No metrics available" }
-                    metricsLabel.visibility = View.VISIBLE
-                    updateProgressUI(100, "Complete. $metricsText")
-                }
-            } catch (cancelled: CancellationException) {
-                updateProgressUI(0, "Cancelled")
-            } catch (oom: OutOfMemoryError) {
-                android.util.Log.e(TAG, "Out of memory", oom)
-                logDemoMemoryState(TAG, "OOM error", includeGpu = true)
-                updateProgressUI(0, "Out of memory. Close other apps and try again.")
-            } catch (t: Throwable) {
-                android.util.Log.e(TAG, "Failed", t)
-                updateProgressUI(0, "Failed: ${t.localizedMessage}")
-            } finally {
-                withContext(Dispatchers.Main) {
-                    progressBar.visibility = View.GONE
-                    generateButton.isEnabled = true
-                    generationJob = null
-                }
-            }
+        if (loraRequested) {
+            android.util.Log.w(
+                TAG,
+                "Image LoRA toggle requested, but current JNI image generation binding does not support per-generation LoRA application. Continuing without LoRA.",
+            )
+            Toast.makeText(
+                this,
+                "Image LoRA is not supported in the current runtime. Generating without it.",
+                Toast.LENGTH_LONG,
+            ).show()
         }
+
+        logDemoMemoryState(TAG, "Before image generation", includeGpu = true)
+
+        val useFlashAttn = width >= 512 && height >= 512
+        val params =
+            ImageGenerationRequest(
+                prompt = prompt,
+                width = width,
+                height = height,
+                steps = steps,
+                cfgScale = cfg,
+                seed = seed,
+                flashAttention = useFlashAttn,
+                forceSequentialLoad = false,
+                loraModelDir = null,
+                loraApplyMode = LoraApplyMode.AUTO,
+            )
+        android.util.Log.i(
+            TAG,
+            "Submitting image request: width=${params.width}, height=${params.height}, steps=${params.steps}, " +
+                "flash=${params.flashAttention}, easyCache=${params.easyCache.enabled}, sequential=${params.forceSequentialLoad}, " +
+                "lora=$loraRequested",
+        )
+
+        controller.start(
+            config =
+                ImageGenerationConfig(
+                    request = params,
+                    loraRequested = loraRequested,
+                ),
+            callbacks =
+                ImageGenerationCallbacks(
+                    onProgress = ::updateProgressUI,
+                    onCompleted = { result ->
+                        logDemoMemoryState(TAG, "After image generation", includeGpu = true)
+                        previewImage.setImageBitmap(result.bitmap)
+                        result.metrics?.imageRequestMetrics?.let { imageMetrics ->
+                            android.util.Log.i(
+                                TAG,
+                                "Image request completed: requestId=${result.requestId}, warmRuntime=${imageMetrics.cacheHit}, " +
+                                    "loadMs=${imageMetrics.modelLoadMs}, generateMs=${imageMetrics.generateMs}, totalMs=${imageMetrics.totalWallTimeMs}, " +
+                                    "flash=${imageMetrics.flashAttentionEnabled}, easyCache=${imageMetrics.easyCacheEnabled}, " +
+                                    "backend=${imageMetrics.backend}, size=${imageMetrics.width}x${imageMetrics.height}, steps=${imageMetrics.steps}",
+                            )
+                        }
+                        val metricsText = result.metrics?.let(::formatMetricsText) ?: ""
+                        metricsLabel.text = metricsText.ifBlank { "No metrics available" }
+                        metricsLabel.visibility = View.VISIBLE
+                        updateProgressUI(100, "Complete. $metricsText")
+                    },
+                    onCancelled = { requestId, reason, phase ->
+                        android.util.Log.i(
+                            TAG,
+                            "Image request cancelled in activity: requestId=$requestId, reason=${reason.logLabel}, phase=$phase",
+                        )
+                        if (!isDestroyed) {
+                            updateProgressUI(0, "Cancelled: ${reason.statusLabel}")
+                        }
+                    },
+                    onFinished = {
+                        progressBar.visibility = View.GONE
+                        generateButton.isEnabled = true
+                    },
+                ),
+        )
     }
 
     private fun cancelGeneration() {
-        generationJob?.cancel()
-        edge.image.cancelGeneration()
-        updateProgressUI(0, "Cancelled")
+        controller.cancel(ImageGenerationCancellationReason.USER_CANCEL)
     }
 
     private fun updateProgressUI(percent: Int, status: String) {
@@ -224,6 +209,19 @@ class ImageGenerationActivity : AppCompatActivity() {
             progressLabel.text = status
         }
     }
+
+    private fun formatMetricsText(metrics: GenerationMetrics): String {
+        val imageMetrics = metrics.imageRequestMetrics
+        if (imageMetrics != null) {
+            val warmLabel = if (imageMetrics.cacheHit) "warm" else "cold"
+            return "Load ${formatDuration(imageMetrics.runtimeAcquireMs)} ($warmLabel), " +
+                "Generate ${formatDuration(imageMetrics.generateMs)}, " +
+                "Total ${formatDuration(imageMetrics.totalWallTimeMs)}"
+        }
+        return "Generated in ${String.format("%.1f", metrics.totalTimeSeconds)}s"
+    }
+
+    private fun formatDuration(durationMs: Long): String = String.format("%.2fs", durationMs / 1000f)
 
     private fun parseDimensionField(field: EditText, defaultValue: Int, label: String): Int? {
         val value = field.text.toString().ifBlank { defaultValue.toString() }.toIntOrNull()
@@ -277,8 +275,8 @@ class ImageGenerationActivity : AppCompatActivity() {
         super.onTrimMemory(level)
         if (TrimMemorySupport.isRunningLow(level)) {
             android.util.Log.w(TAG, "System memory low (level=$level)")
-            if (generationJob?.isActive == true) {
-                cancelGeneration()
+            if (controller.isGenerating()) {
+                controller.cancel(ImageGenerationCancellationReason.LOW_MEMORY)
                 runOnUiThread {
                     Toast.makeText(
                         this,
@@ -290,8 +288,25 @@ class ImageGenerationActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStop() {
+        android.util.Log.i(
+            TAG,
+            "onStop: isGenerating=${controller.isGenerating()}, requestId=${controller.currentRequestId()}, phase=${controller.currentPhaseText()}",
+        )
+        if (controller.isGenerating()) {
+            controller.cancel(ImageGenerationCancellationReason.SCREEN_LEFT)
+        }
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        android.util.Log.i(
+            TAG,
+            "onDestroy: isGenerating=${controller.isGenerating()}, requestId=${controller.currentRequestId()}, phase=${controller.currentPhaseText()}, isFinishing=$isFinishing",
+        )
+        if (controller.isGenerating()) {
+            controller.cancel(ImageGenerationCancellationReason.SCREEN_LEFT)
+        }
         super.onDestroy()
-        generationJob?.cancel()
     }
 }
