@@ -14,6 +14,12 @@ import androidx.lifecycle.lifecycleScope
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.GenerationMetrics
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Activity for image generation using MeinaMix SD 1.5 model.
@@ -59,6 +65,8 @@ class ImageGenerationActivity : AppCompatActivity() {
             tag = TAG,
         )
     }
+    private val requestPreparer by lazy(LazyThreadSafetyMode.NONE) { ImageGenerationRequestPreparer() }
+    private var requestPreparationJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,7 +95,7 @@ class ImageGenerationActivity : AppCompatActivity() {
     }
 
     private fun startGeneration() {
-        if (controller.isGenerating()) {
+        if (controller.isGenerating() || requestPreparationJob?.isActive == true) {
             Toast.makeText(this, "Generation already running", Toast.LENGTH_SHORT).show()
             return
         }
@@ -117,22 +125,8 @@ class ImageGenerationActivity : AppCompatActivity() {
         val prompt = promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
         val loraRequested = loraToggle.isChecked
 
-        if (loraRequested) {
-            android.util.Log.w(
-                TAG,
-                "Image LoRA toggle requested, but current JNI image generation binding does not support per-generation LoRA application. Continuing without LoRA.",
-            )
-            Toast.makeText(
-                this,
-                "Image LoRA is not supported in the current runtime. Generating without it.",
-                Toast.LENGTH_LONG,
-            ).show()
-        }
-
-        logDemoMemoryState(TAG, "Before image generation", includeGpu = true)
-
         val useFlashAttn = width >= 512 && height >= 512
-        val params =
+        val baseRequest =
             ImageGenerationRequest(
                 prompt = prompt,
                 width = width,
@@ -145,57 +139,105 @@ class ImageGenerationActivity : AppCompatActivity() {
                 loraModelDir = null,
                 loraApplyMode = LoraApplyMode.AUTO,
             )
-        android.util.Log.i(
-            TAG,
-            "Submitting image request: width=${params.width}, height=${params.height}, steps=${params.steps}, " +
-                "flash=${params.flashAttention}, easyCache=${params.easyCache.enabled}, sequential=${params.forceSequentialLoad}, " +
-                "lora=$loraRequested",
-        )
 
-        controller.start(
-            config =
-                ImageGenerationConfig(
-                    request = params,
-                    loraRequested = loraRequested,
-                ),
-            callbacks =
-                ImageGenerationCallbacks(
-                    onProgress = ::updateProgressUI,
-                    onCompleted = { result ->
-                        logDemoMemoryState(TAG, "After image generation", includeGpu = true)
-                        previewImage.setImageBitmap(result.bitmap)
-                        result.metrics?.imageRequestMetrics?.let { imageMetrics ->
-                            android.util.Log.i(
-                                TAG,
-                                "Image request completed: requestId=${result.requestId}, warmRuntime=${imageMetrics.cacheHit}, " +
-                                    "loadMs=${imageMetrics.modelLoadMs}, generateMs=${imageMetrics.generateMs}, totalMs=${imageMetrics.totalWallTimeMs}, " +
-                                    "flash=${imageMetrics.flashAttentionEnabled}, easyCache=${imageMetrics.easyCacheEnabled}, " +
-                                    "backend=${imageMetrics.backend}, size=${imageMetrics.width}x${imageMetrics.height}, steps=${imageMetrics.steps}",
+        requestPreparationJob =
+            lifecycleScope.launch {
+                try {
+                    val prepared =
+                        withContext(Dispatchers.IO) {
+                            requestPreparer.prepare(
+                                context = this@ImageGenerationActivity,
+                                baseRequest = baseRequest,
+                                loraRequested = loraRequested,
+                                onStatus = { status -> updateProgressUI(0, status) },
                             )
                         }
-                        val metricsText = result.metrics?.let(::formatMetricsText) ?: ""
-                        metricsLabel.text = metricsText.ifBlank { "No metrics available" }
-                        metricsLabel.visibility = View.VISIBLE
-                        updateProgressUI(100, "Complete. $metricsText")
-                    },
-                    onCancelled = { requestId, reason, phase ->
-                        android.util.Log.i(
-                            TAG,
-                            "Image request cancelled in activity: requestId=$requestId, reason=${reason.logLabel}, phase=$phase",
-                        )
-                        if (!isDestroyed) {
-                            updateProgressUI(0, "Cancelled: ${reason.statusLabel}")
-                        }
-                    },
-                    onFinished = {
+                    if (!isActive) {
+                        return@launch
+                    }
+                    prepared.warningMessage?.let {
+                        Toast.makeText(this@ImageGenerationActivity, it, Toast.LENGTH_LONG).show()
+                    }
+
+                    logDemoMemoryState(TAG, "Before image generation", includeGpu = true)
+
+                    android.util.Log.i(
+                        TAG,
+                        "Submitting image request: width=${prepared.request.width}, height=${prepared.request.height}, steps=${prepared.request.steps}, " +
+                            "flash=${prepared.request.flashAttention}, easyCache=${prepared.request.easyCache.enabled}, " +
+                            "sequential=${prepared.request.forceSequentialLoad}, loraRequested=$loraRequested, " +
+                            "loraApplied=${prepared.loraApplied}, loraDir=${prepared.request.loraModelDir ?: "none"}",
+                    )
+
+                    controller.start(
+                        config =
+                            ImageGenerationConfig(
+                                request = prepared.request,
+                                loraRequested = loraRequested,
+                            ),
+                        callbacks =
+                            ImageGenerationCallbacks(
+                                onProgress = ::updateProgressUI,
+                                onCompleted = { result ->
+                                    logDemoMemoryState(TAG, "After image generation", includeGpu = true)
+                                    previewImage.setImageBitmap(result.bitmap)
+                                    result.metrics?.imageRequestMetrics?.let { imageMetrics ->
+                                        android.util.Log.i(
+                                            TAG,
+                                            "Image request completed: requestId=${result.requestId}, warmRuntime=${imageMetrics.cacheHit}, " +
+                                                "loadMs=${imageMetrics.modelLoadMs}, generateMs=${imageMetrics.generateMs}, totalMs=${imageMetrics.totalWallTimeMs}, " +
+                                                "flash=${imageMetrics.flashAttentionEnabled}, easyCache=${imageMetrics.easyCacheEnabled}, " +
+                                                "backend=${imageMetrics.backend}, size=${imageMetrics.width}x${imageMetrics.height}, steps=${imageMetrics.steps}",
+                                        )
+                                    }
+                                    val metricsText = result.metrics?.let(::formatMetricsText) ?: ""
+                                    metricsLabel.text = metricsText.ifBlank { "No metrics available" }
+                                    metricsLabel.visibility = View.VISIBLE
+                                    updateProgressUI(100, "Complete. $metricsText")
+                                },
+                                onCancelled = { requestId, reason, phase ->
+                                    android.util.Log.i(
+                                        TAG,
+                                        "Image request cancelled in activity: requestId=$requestId, reason=${reason.logLabel}, phase=$phase",
+                                    )
+                                    if (!isDestroyed) {
+                                        updateProgressUI(0, "Cancelled: ${reason.statusLabel}")
+                                    }
+                                },
+                                onFinished = {
+                                    progressBar.visibility = View.GONE
+                                    generateButton.isEnabled = true
+                                },
+                            ),
+                    )
+                } catch (_: CancellationException) {
+                    if (!controller.isGenerating() && !isDestroyed) {
+                        generateButton.isEnabled = true
+                        updateProgressUI(0, "Cancelled: user cancelled")
+                        progressBar.visibility = View.GONE
+                    }
+                } catch (t: Throwable) {
+                    android.util.Log.e(TAG, "Failed to prepare image request", t)
+                    if (!isDestroyed) {
                         progressBar.visibility = View.GONE
                         generateButton.isEnabled = true
-                    },
-                ),
-        )
+                        Toast.makeText(
+                            this@ImageGenerationActivity,
+                            "Failed to prepare request: ${t.localizedMessage ?: "unknown error"}",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                } finally {
+                    requestPreparationJob = null
+                }
+            }
     }
 
     private fun cancelGeneration() {
+        if (requestPreparationJob?.isActive == true) {
+            requestPreparationJob?.cancel(CancellationException("Image request preparation cancelled"))
+            return
+        }
         controller.cancel(ImageGenerationCancellationReason.USER_CANCEL)
     }
 
@@ -275,6 +317,9 @@ class ImageGenerationActivity : AppCompatActivity() {
         super.onTrimMemory(level)
         if (TrimMemorySupport.isRunningLow(level)) {
             android.util.Log.w(TAG, "System memory low (level=$level)")
+            if (requestPreparationJob?.isActive == true) {
+                requestPreparationJob?.cancel(CancellationException("Image request preparation cancelled due to low memory"))
+            }
             if (controller.isGenerating()) {
                 controller.cancel(ImageGenerationCancellationReason.LOW_MEMORY)
                 runOnUiThread {
@@ -291,8 +336,9 @@ class ImageGenerationActivity : AppCompatActivity() {
     override fun onStop() {
         android.util.Log.i(
             TAG,
-            "onStop: isGenerating=${controller.isGenerating()}, requestId=${controller.currentRequestId()}, phase=${controller.currentPhaseText()}",
+            "onStop: isGenerating=${controller.isGenerating()}, preparing=${requestPreparationJob?.isActive == true}, requestId=${controller.currentRequestId()}, phase=${controller.currentPhaseText()}",
         )
+        requestPreparationJob?.cancel(CancellationException("Image request preparation cancelled because screen left"))
         if (controller.isGenerating()) {
             controller.cancel(ImageGenerationCancellationReason.SCREEN_LEFT)
         }
@@ -302,8 +348,9 @@ class ImageGenerationActivity : AppCompatActivity() {
     override fun onDestroy() {
         android.util.Log.i(
             TAG,
-            "onDestroy: isGenerating=${controller.isGenerating()}, requestId=${controller.currentRequestId()}, phase=${controller.currentPhaseText()}, isFinishing=$isFinishing",
+            "onDestroy: isGenerating=${controller.isGenerating()}, preparing=${requestPreparationJob?.isActive == true}, requestId=${controller.currentRequestId()}, phase=${controller.currentPhaseText()}, isFinishing=$isFinishing",
         )
+        requestPreparationJob?.cancel(CancellationException("Image request preparation cancelled because activity is being destroyed"))
         if (controller.isGenerating()) {
             controller.cancel(ImageGenerationCancellationReason.SCREEN_LEFT)
         }
