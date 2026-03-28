@@ -5,7 +5,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application
-        android:name=".LLMEdgeExampleApp"
+        android:name=".app.LLMEdgeExampleApp"
         android:label="llmedge Example"
         android:allowBackup="true"
         android:supportsRtl="true"
@@ -24,56 +24,56 @@
             />
         </provider>
         <activity
-            android:name=".HuggingFaceDemoActivity"
+            android:name=".demo.text.HuggingFaceDemoActivity"
             android:exported="false"
         />
         <activity
-            android:name=".LocalAssetDemoActivity"
+            android:name=".demo.text.LocalAssetDemoActivity"
             android:exported="false"
         />
         <activity
-            android:name=".JinjaTemplateDemoActivity"
+            android:name=".demo.text.JinjaTemplateDemoActivity"
             android:exported="false"
         />
-        <activity android:name=".RagActivity" android:exported="false" />
+        <activity android:name=".demo.rag.RagActivity" android:exported="false" />
         <activity
-            android:name=".ImageToTextActivity"
+            android:name=".demo.vision.ImageToTextActivity"
             android:exported="false"
         />
-            <activity android:name=".LlavaVisionActivity" />
+            <activity android:name=".demo.vision.LlavaVisionActivity" />
         <activity
-            android:name=".VideoGenerationActivity"
+            android:name=".demo.video.VideoGenerationActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
-            android:name=".ImageGenerationActivity"
+            android:name=".demo.image.ImageGenerationActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
-            android:name=".ToolCallingDemoActivity"
+            android:name=".demo.tools.ToolCallingDemoActivity"
             android:exported="false" />
         <activity
-            android:name=".HeadlessVideoTestActivity"
+            android:name=".demo.video.HeadlessVideoTestActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
         />
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".app.MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
         <activity
-            android:name=".SmolJavaExampleActivity"
+            android:name=".demo.text.SmolJavaExampleActivity"
             android:exported="false"
         />
         <activity
-            android:name=".TranscriptionActivity"
+            android:name=".demo.speech.TranscriptionActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
-            android:name=".TTSActivity"
+            android:name=".demo.speech.TTSActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
     </application>

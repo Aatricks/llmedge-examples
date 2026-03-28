@@ -119,18 +119,13 @@ From the repository root directory:
 ./gradlew :llmedge:assembleRelease
 ```
 
-2. Copy the AAR to the examples project:
-```bash
-cp llmedge/build/outputs/aar/llmedge-release.aar llmedge-examples/app/libs/llmedge-release.aar
-```
-
-3. Build the example application:
+2. Build the example application:
 ```bash
 cd llmedge-examples
 ./gradlew :app:assembleDebug
 ```
 
-4. Install to device:
+3. Install to device:
 ```bash
 ./gradlew :app:installDebug
 ```
@@ -143,8 +138,6 @@ For Android GPU builds with OpenCL-first, Vulkan-fallback runtime selection:
 ./gradlew :llmedge:assembleRelease \
   -PllmedgeAndroidOpencl=ON \
   -Pandroid.jniCmakeArgs="-DGGML_VULKAN=ON -DSD_VULKAN=ON"
-
-cp llmedge/build/outputs/aar/llmedge-release.aar llmedge-examples/app/libs/llmedge-release.aar
 
 cd llmedge-examples
 ./gradlew :app:assembleDebug :app:installDebug
