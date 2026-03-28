@@ -81,20 +81,15 @@ class ToolCallingDemoActivity : AppCompatActivity() {
                         )
                     val modelFile =
                         edge.models.prefetch(modelSpec) { progress ->
-                            val downloadedMb = progress.downloadedBytes / (1024.0 * 1024.0)
-                            val totalMb = progress.totalBytes?.div(1024.0 * 1024.0)
                             runOnUiThread {
                                 if (isUiActive()) {
                                     textStatus.text =
-                                        if (totalMb != null && totalMb > 0) {
-                                            "Downloading model: ${
-                                                String.format(Locale.US, "%.1f", downloadedMb)
-                                            } / ${String.format(Locale.US, "%.1f", totalMb)} MB"
-                                        } else {
-                                            "Downloading model: ${
-                                                String.format(Locale.US, "%.1f", downloadedMb)
-                                            } MB"
-                                        }
+                                        formatDownloadProgress(
+                                            downloadedBytes = progress.downloadedBytes,
+                                            totalBytes = progress.totalBytes,
+                                            prefix = "Downloading model",
+                                            decimals = 1,
+                                        )
                                 }
                             }
                         }

@@ -1,12 +1,9 @@
 package com.example.llmedgeexample
 
 import android.app.Activity
-import android.app.ActivityManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.provider.OpenableColumns
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -32,7 +29,6 @@ class RagActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "RagActivity"
         private const val REQ_PICK_PDF = 42
-        private const val BYTES_IN_MB = 1024L * 1024L
     }
     
     private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, lifecycleScope) }
@@ -63,7 +59,7 @@ class RagActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             // Check memory before loading
-            val availMemMB = getAvailableMemoryMB()
+            val availMemMB = availableMemoryMb()
             android.util.Log.i(TAG, "Available memory: ${availMemMB}MB")
             
             if (availMemMB < 1500) {
@@ -77,7 +73,7 @@ class RagActivity : AppCompatActivity() {
             }
             
             try {
-                logMemoryState("Before LLM load")
+                logDemoMemoryState(TAG, "Before LLM load")
                 rag =
                     withContext(Dispatchers.IO) {
                         edge.rag.createSession(
@@ -92,14 +88,14 @@ class RagActivity : AppCompatActivity() {
                         ).also { it.init() }
                     }
                 
-                logMemoryState("After LLM and RAG init")
+                logDemoMemoryState(TAG, "After LLM and RAG init")
                 
                 withContext(Dispatchers.Main) {
                     status.text = "LLM ready. Pick a PDF to index."
                 }
             } catch (oom: OutOfMemoryError) {
                 android.util.Log.e(TAG, "OOM loading LLM", oom)
-                logMemoryState("OOM error")
+                logDemoMemoryState(TAG, "OOM error")
                 withContext(Dispatchers.Main) {
                     status.text = "Out of memory. Close other apps and restart."
                 }
@@ -151,13 +147,13 @@ class RagActivity : AppCompatActivity() {
         status.text = "Indexing..."
         lifecycleScope.launch {
             try {
-                logMemoryState("Before indexing")
+                logDemoMemoryState(TAG, "Before indexing")
                 
                 val count = withContext(Dispatchers.IO) {
                     rag?.indexPdf(uri) ?: 0
                 }
                 
-                logMemoryState("After indexing")
+                logDemoMemoryState(TAG, "After indexing")
                 
                 withContext(Dispatchers.Main) {
                     status.text = if (count > 0) {
@@ -189,7 +185,7 @@ class RagActivity : AppCompatActivity() {
         answer.text = ""
         lifecycleScope.launch {
             try {
-                logMemoryState("Before RAG query")
+                logDemoMemoryState(TAG, "Before RAG query")
                 
                 // Build context separately to populate the panel
                 withContext(Dispatchers.IO) {
@@ -204,7 +200,7 @@ class RagActivity : AppCompatActivity() {
                 }
                 val metrics = rag?.getLastGenerationMetrics()
                 
-                logMemoryState("After RAG query")
+                logDemoMemoryState(TAG, "After RAG query")
                 
                 withContext(Dispatchers.Main) {
                     answer.text = a
@@ -276,12 +272,7 @@ class RagActivity : AppCompatActivity() {
         return has
     }
 
-    private fun getDisplayName(uri: Uri): String {
-        return contentResolver.query(uri, null, null, null, null)?.use { c ->
-            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (idx >= 0 && c.moveToFirst()) c.getString(idx) else uri.lastPathSegment ?: "PDF"
-        } ?: (uri.lastPathSegment ?: "PDF")
-    }
+    private fun getDisplayName(uri: Uri): String = getOpenableDisplayName(uri, "PDF")
 
     private fun formatMetrics(metrics: io.aatricks.llmedge.text.runtime.SmolLM.GenerationMetrics): String {
         val throughput = String.format(Locale.US, "%.2f", metrics.tokensPerSecond)
@@ -289,25 +280,4 @@ class RagActivity : AppCompatActivity() {
         return "tokens=${metrics.tokenCount} | $throughput tok/s | $duration s"
     }
 
-    private fun getAvailableMemoryMB(): Long {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memInfo)
-        return memInfo.availMem / BYTES_IN_MB
-    }
-
-    private fun logMemoryState(phase: String) {
-        val runtime = Runtime.getRuntime()
-        val heapUsed = (runtime.totalMemory() - runtime.freeMemory()) / BYTES_IN_MB
-        val heapMax = runtime.maxMemory() / BYTES_IN_MB
-
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        val systemAvail = memoryInfo.availMem / BYTES_IN_MB
-
-        android.util.Log.i(TAG, "=== Memory: $phase ===")
-        android.util.Log.i(TAG, "  Heap: ${heapUsed}MB / ${heapMax}MB max")
-        android.util.Log.i(TAG, "  System: ${systemAvail}MB available")
-    }
 }

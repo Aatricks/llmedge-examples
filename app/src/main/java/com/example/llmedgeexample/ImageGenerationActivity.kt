@@ -1,7 +1,5 @@
 package com.example.llmedgeexample
 
-import android.app.ActivityManager
-import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -13,7 +11,6 @@ import android.widget.Toast
 import android.widget.Switch
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import kotlinx.coroutines.CancellationException
@@ -40,7 +37,6 @@ class ImageGenerationActivity : AppCompatActivity() {
         private const val DEFAULT_STEPS = 20
         private const val DEFAULT_CFG = 7.0f
         private const val DEFAULT_SEED = -1L
-        private const val BYTES_IN_MB = 1024L * 1024L
     }
 
     private val promptInput: EditText by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.videoPromptInput) }
@@ -85,7 +81,7 @@ class ImageGenerationActivity : AppCompatActivity() {
         }
 
         // Log initial memory state
-        logMemoryState("Activity created")
+        logDemoMemoryState(TAG, "Activity created", includeGpu = true)
     }
 
     private fun startGeneration() {
@@ -101,7 +97,7 @@ class ImageGenerationActivity : AppCompatActivity() {
         val seed = parseSeedField() ?: return
 
         // Check available memory
-        val availMemMB = getAvailableMemoryMB()
+        val availMemMB = availableMemoryMb()
         android.util.Log.i(TAG, "Starting generation with ${availMemMB}MB available")
         
         if (availMemMB < 2000) {
@@ -151,7 +147,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                 }
                 
                 // Log memory before generation
-                logMemoryState("Before image generation")
+                logDemoMemoryState(TAG, "Before image generation", includeGpu = true)
 
                 updateProgressUI(0, "Preparing...")
 
@@ -176,7 +172,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                 val bitmap = edge.image.generate(params)
 
                 // Log memory after generation
-                logMemoryState("After image generation")
+                logDemoMemoryState(TAG, "After image generation", includeGpu = true)
 
                 withContext(Dispatchers.Main) {
                     previewImage.setImageBitmap(bitmap)
@@ -197,7 +193,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                 updateProgressUI(0, "Cancelled")
             } catch (oom: OutOfMemoryError) {
                 android.util.Log.e(TAG, "Out of memory", oom)
-                logMemoryState("OOM error")
+                logDemoMemoryState(TAG, "OOM error", includeGpu = true)
                 updateProgressUI(0, "Out of memory. Close other apps and try again.")
             } catch (t: Throwable) {
                 android.util.Log.e(TAG, "Failed", t)
@@ -297,35 +293,5 @@ class ImageGenerationActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         generationJob?.cancel()
-    }
-
-    private fun getAvailableMemoryMB(): Long {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memInfo)
-        return memInfo.availMem / BYTES_IN_MB
-    }
-
-    private fun logMemoryState(phase: String) {
-        val runtime = Runtime.getRuntime()
-        val heapUsed = (runtime.totalMemory() - runtime.freeMemory()) / BYTES_IN_MB
-        val heapMax = runtime.maxMemory() / BYTES_IN_MB
-
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        val systemAvail = memoryInfo.availMem / BYTES_IN_MB
-        val systemTotal = memoryInfo.totalMem / BYTES_IN_MB
-
-        android.util.Log.i(TAG, "=== Memory: $phase ===")
-        android.util.Log.i(TAG, "  Heap: ${heapUsed}MB / ${heapMax}MB max")
-        android.util.Log.i(TAG, "  System: ${systemAvail}MB / ${systemTotal}MB total")
-
-        if (isOpenClAvailableCompat()) {
-            android.util.Log.i(TAG, "  OpenCL: available")
-        }
-        LLMEdge.getVulkanDeviceInfo()?.let { vulkan ->
-            android.util.Log.i(TAG, "  Vulkan: ${vulkan.freeMemoryMB}MB / ${vulkan.totalMemoryMB}MB")
-        }
     }
 }

@@ -125,7 +125,9 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
                                                     appendLine("Flash attention: $FLASH_ATTN_ENABLED")
                                                     appendLine()
                                                     appendLine("Download:")
-                                                    appendLine(formatProgress(downloaded, total))
+                                                    appendLine(
+                                                        formatDownloadProgress(downloaded, total)
+                                                    )
                                                     appendLine()
                                                     appendLine("Model:")
                                                     appendLine("$MODEL_ID ($MODEL_FILENAME @ $MODEL_REVISION)")
@@ -195,16 +197,5 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
         smol?.close()
         smol = null
         super.onDestroy()
-    }
-
-    private fun formatProgress(downloaded: Long, total: Long?): String {
-        val downloadedMb = downloaded / (1024.0 * 1024.0)
-        val totalMb = total?.div(1024.0 * 1024.0)
-        return if (totalMb != null && totalMb > 0.0) {
-            "Downloading: ${"%.2f".format(Locale.US, downloadedMb)} MB / " +
-                "${"%.2f".format(Locale.US, totalMb)} MB"
-        } else {
-            "Downloading: ${"%.2f".format(Locale.US, downloadedMb)} MB"
-        }
     }
 }

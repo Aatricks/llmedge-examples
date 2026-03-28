@@ -1,9 +1,6 @@
 package com.example.llmedgeexample
 
-import android.app.ActivityManager
 import android.app.Application
-import android.content.Context
-import io.aatricks.llmedge.LLMEdge
 
 /**
  * Application class for LLMEdge Example app.
@@ -15,11 +12,10 @@ class LLMEdgeExampleApp : Application() {
 
     companion object {
         private const val TAG = "LLMEdgeExampleApp"
-        private const val BYTES_IN_MB = 1024L * 1024L
-        
+
         @Volatile
         private var instance: LLMEdgeExampleApp? = null
-        
+
         fun getInstance(): LLMEdgeExampleApp? = instance
     }
 
@@ -78,48 +74,18 @@ class LLMEdgeExampleApp : Application() {
      * Log detailed memory state for debugging.
      */
     fun logMemoryState(phase: String) {
-        val runtime = Runtime.getRuntime()
-        val heapUsed = (runtime.totalMemory() - runtime.freeMemory()) / BYTES_IN_MB
-        val heapMax = runtime.maxMemory() / BYTES_IN_MB
-        val heapFree = heapMax - heapUsed
-
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        val systemAvail = memoryInfo.availMem / BYTES_IN_MB
-        val systemTotal = memoryInfo.totalMem / BYTES_IN_MB
-
-        FileLogger.i(TAG, "=== Memory State: $phase ===")
-        FileLogger.i(TAG, "  Heap: ${heapUsed}MB used / ${heapMax}MB max (${heapFree}MB free)")
-        FileLogger.i(TAG, "  System: ${systemAvail}MB available / ${systemTotal}MB total")
-        FileLogger.i(TAG, "  Low memory: ${memoryInfo.lowMemory}")
-        
-        if (isOpenClAvailableCompat()) {
-            FileLogger.i(TAG, "  OpenCL: available")
-        }
-        LLMEdge.getVulkanDeviceInfo()?.let { vulkan ->
-            FileLogger.i(TAG, "  Vulkan: ${vulkan.freeMemoryMB}MB free / ${vulkan.totalMemoryMB}MB total")
-        }
+        val snapshot = demoMemorySnapshot()
+        logDemoMemoryState(TAG, phase, includeGpu = true) { FileLogger.i(TAG, it) }
+        FileLogger.i(TAG, "  Heap free: ${snapshot.heapMaxMb - snapshot.heapUsedMb}MB")
     }
     
     /**
      * Check if device has low memory (less than 8GB total RAM).
      */
-    fun isLowMemoryDevice(): Boolean {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memInfo)
-        val totalRamGB = memInfo.totalMem / (1024L * 1024L * 1024L)
-        return totalRamGB < 8
-    }
+    fun isLowMemoryDevice(): Boolean = isLowRamDevice()
 
     /**
      * Get available system memory in MB.
      */
-    fun getAvailableMemoryMB(): Long {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memInfo)
-        return memInfo.availMem / BYTES_IN_MB
-    }
+    fun getAvailableMemoryMB(): Long = availableMemoryMb()
 }

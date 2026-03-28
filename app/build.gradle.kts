@@ -3,16 +3,6 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.0.0"
 }
 
-val localLlmEdgeAar = rootDir.parentFile.resolve("llmedge/build/outputs/aar/llmedge-release.aar")
-val bundledLlmEdgeAar = layout.projectDirectory.file("libs/llmedge-release.aar").asFile
-val syncLocalLlmEdgeAar by tasks.registering(Copy::class) {
-    description = "Sync the latest locally built llmedge AAR into the example app."
-    from(localLlmEdgeAar)
-    into(layout.projectDirectory.dir("libs"))
-    rename { "llmedge-release.aar" }
-    onlyIf { localLlmEdgeAar.exists() }
-}
-
 // Note: we depend on ML Kit text-recognition at runtime. Avoid referencing
 // coordinates that may not be available in the example app's repositories.
 
@@ -57,13 +47,8 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 
-tasks.named("preBuild").configure {
-    dependsOn(syncLocalLlmEdgeAar)
-}
-
 dependencies {
-    // Use the bundled AAR placed in this app's libs/ directory (avoids AGP artifact extraction issues)
-    implementation(files(bundledLlmEdgeAar))
+    implementation("io.aatricks:llmedge:dev")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     // Provides TasksKt.await extension used when awaiting Task<T> from ML Kit
@@ -72,25 +57,6 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.8.0")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-
-    // ML Kit Text Recognition required at runtime when using MlKitOcrEngine from the library AAR
-    implementation("com.google.mlkit:text-recognition:16.0.0")
-    // ML Kit Image Labeling used by LocalImageDescriber
-    implementation("com.google.mlkit:image-labeling:17.0.7")
-    // Note: don't request unavailable coordinates here; rely on text-recognition artifact below.
-
-    // Match library deps needed by RAG demo
-    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
-    implementation("com.google.code.gson:gson:2.11.0")
-
-     // Required: sentence-embeddings used by the library (file-based AAR does not pull transitives)
-    implementation("io.gitlab.shubham0204:sentence-embeddings:v6")
-
-    // Hugging Face client dependencies (needed at runtime when using the library helper)
-    implementation("io.ktor:ktor-client-core:2.3.12")
-    implementation("io.ktor:ktor-client-okhttp:2.3.12")
-    implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Android instrumented test dependencies

@@ -1,7 +1,5 @@
 package com.example.llmedgeexample
 
-import android.app.ActivityManager
-import android.content.Context
 import android.os.Bundle
 import android.widget.Button
 import android.widget.CheckBox
@@ -30,7 +28,6 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "HuggingFaceDemoActivity"
-        private const val BYTES_IN_MB = 1024L * 1024L
     }
 
     private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, lifecycleScope) }
@@ -75,7 +72,7 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
             }
 
             // Check available memory before starting
-            val availMemMB = getAvailableMemoryMB()
+            val availMemMB = availableMemoryMb()
             if (availMemMB < 1500) {
                 if (isUiActive()) {
                     textStatus.text = "Warning: Low memory (${availMemMB}MB). Close other apps."
@@ -91,7 +88,7 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 try {
                     // Log memory state
-                    logMemoryState("Before download")
+                    logDemoMemoryState(TAG, "Before download")
                     
                     // 1. Download/Ensure model is available
                     val modelSpec =
@@ -106,7 +103,7 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                         val total = progress.totalBytes
                             runOnUiThread {
                                 if (isUiActive()) {
-                                    textStatus.text = formatProgress(downloaded, total)
+                                    textStatus.text = formatDownloadProgress(downloaded, total)
                                 }
                             }
                         }
@@ -118,7 +115,7 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                         }
                     }
 
-                    logMemoryState("After download, before generation")
+                    logDemoMemoryState(TAG, "After download, before generation")
 
                     // 2. Generate Text
                     val thinkingMode = if (disableThinkingChecked)
@@ -144,7 +141,7 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
 
                     val metrics = edge.text.getLastGenerationMetrics()
                     
-                    logMemoryState("After generation")
+                    logDemoMemoryState(TAG, "After generation")
 
                     if (isUiActive()) {
                         textOutput.text = buildString {
@@ -166,7 +163,7 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
                     }
                 } catch (oom: OutOfMemoryError) {
                     android.util.Log.e(TAG, "Out of memory", oom)
-                    logMemoryState("OOM error")
+                    logDemoMemoryState(TAG, "OOM error")
                     if (isUiActive()) {
                         textStatus.text = "Out of memory. Try a smaller model or close other apps."
                         textOutput.text = ""
@@ -190,41 +187,8 @@ class HuggingFaceDemoActivity : AppCompatActivity() {
         finish()
         return true
     }
-
-    private fun formatProgress(downloaded: Long, total: Long?): String {
-        val downloadedMb = downloaded / (1024.0 * 1024.0)
-        val totalMb = total?.div(1024.0 * 1024.0)
-        return if (totalMb != null && totalMb > 0) {
-            "Downloading: ${String.format(Locale.US, "%.2f", downloadedMb)} MB / ${String.format(Locale.US, "%.2f", totalMb)} MB"
-        } else {
-            "Downloading: ${String.format(Locale.US, "%.2f", downloadedMb)} MB"
-        }
-    }
-
     private fun isUiActive(): Boolean =
             lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
                     !isFinishing &&
                     !isDestroyed
-
-    private fun getAvailableMemoryMB(): Long {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memInfo)
-        return memInfo.availMem / BYTES_IN_MB
-    }
-
-    private fun logMemoryState(phase: String) {
-        val runtime = Runtime.getRuntime()
-        val heapUsed = (runtime.totalMemory() - runtime.freeMemory()) / BYTES_IN_MB
-        val heapMax = runtime.maxMemory() / BYTES_IN_MB
-
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        val systemAvail = memoryInfo.availMem / BYTES_IN_MB
-
-        android.util.Log.i(TAG, "=== Memory: $phase ===")
-        android.util.Log.i(TAG, "  Heap: ${heapUsed}MB / ${heapMax}MB max")
-        android.util.Log.i(TAG, "  System: ${systemAvail}MB available")
-    }
 }

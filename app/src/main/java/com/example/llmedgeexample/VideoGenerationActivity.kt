@@ -1,8 +1,6 @@
 package com.example.llmedgeexample
 
 import android.app.Activity
-import android.app.ActivityManager
-import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -21,19 +19,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.LLMEdge
-import io.aatricks.llmedge.image.GenerationStreamEvent
-import io.aatricks.llmedge.image.VideoGenerationRequest
-import io.aatricks.llmedge.model.ModelSpec
-import io.aatricks.llmedge.image.diffusion.StableDiffusion
-import io.aatricks.llmedge.image.diffusion.EasyCacheParams
-import io.aatricks.llmedge.image.diffusion.LoraApplyMode
 import io.aatricks.llmedge.image.diffusion.SampleMethod
 import io.aatricks.llmedge.image.diffusion.Scheduler
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -63,7 +52,6 @@ class VideoGenerationActivity : AppCompatActivity() {
         private const val DEFAULT_SEED = -1L
         private const val DEFAULT_FRAMES = 9
         private const val DEFAULT_FPS = 8
-        private const val BYTES_IN_MB = 1024L * 1024L
     }
 
     private val promptInput: EditText by
@@ -131,14 +119,16 @@ class VideoGenerationActivity : AppCompatActivity() {
     private val i2vStrengthLabel: TextView by
             lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.i2vStrengthLabel) }
 
-    private var generationJob: Job? = null
     private var animationJob: Job? = null
     private var initImageBitmap: Bitmap? = null
     private var generatedFrames: List<Bitmap> = emptyList()
     private var selectedLoraPath: String? = null
     private var selectedTaehvPath: String? = null
     private val edge by lazy(LazyThreadSafetyMode.NONE) {
-        bindEdge(this, this, lifecycleScope, preferPerformanceMode = !isLowMemoryDevice())
+        bindEdge(this, this, lifecycleScope, preferPerformanceMode = !isLowRamDevice())
+    }
+    private val generationController by lazy(LazyThreadSafetyMode.NONE) {
+        VideoGenerationController(this, lifecycleScope, edge, TAG)
     }
 
     // Image picker result handler
@@ -224,7 +214,7 @@ class VideoGenerationActivity : AppCompatActivity() {
         )
 
         // Log initial memory state
-        logMemoryState("Activity created")
+        logDemoMemoryState(TAG, "Activity created", includeGpu = true) { FileLogger.i(TAG, it) }
     }
 
     private fun shareLogs() {
@@ -373,49 +363,22 @@ class VideoGenerationActivity : AppCompatActivity() {
 
     private fun loadLoraFile(uri: Uri) {
         try {
-            // Copy the file to the app's cache directory for native access
-            val fileName =
-                    getFileNameFromUri(uri) ?: "lora_${System.currentTimeMillis()}.safetensors"
-            if (!fileName.endsWith(".safetensors")) {
-                Toast.makeText(this, "Please select a .safetensors file", Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            val loraDir = java.io.File(cacheDir, "loras")
-            loraDir.mkdirs()
-            val loraFile = java.io.File(loraDir, fileName)
-
-            contentResolver.openInputStream(uri)?.use { inputStream ->
-                loraFile.outputStream().use { outputStream -> inputStream.copyTo(outputStream) }
-            }
-
-            selectedLoraPath = loraDir.absolutePath
-            loraLabel.text = fileName
+            val loraFile =
+                    copyOpenableToCache(
+                            uri = uri,
+                            subdirectory = "loras",
+                            fallbackFileName =
+                                    "lora_${System.currentTimeMillis()}.safetensors",
+                            requiredSuffix = ".safetensors"
+                    )
+            selectedLoraPath = loraFile.parentFile?.absolutePath
+            loraLabel.text = loraFile.name
             clearLoraButton.visibility = View.VISIBLE
-            FileLogger.i(TAG, "LoRA loaded: $selectedLoraPath/$fileName")
+            FileLogger.i(TAG, "LoRA loaded: ${loraFile.absolutePath}")
         } catch (e: Exception) {
             FileLogger.e(TAG, "Failed to load LoRA file", e)
             Toast.makeText(this, "Failed to load LoRA: ${e.message}", Toast.LENGTH_SHORT).show()
         }
-    }
-
-    private fun getFileNameFromUri(uri: Uri): String? {
-        var result: String? = null
-        if (uri.scheme == "content") {
-            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex =
-                            cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex >= 0) {
-                        result = cursor.getString(nameIndex)
-                    }
-                }
-            }
-        }
-        if (result == null) {
-            result = uri.path?.substringAfterLast('/')
-        }
-        return result
     }
 
     private fun clearLoraFile() {
@@ -436,24 +399,16 @@ class VideoGenerationActivity : AppCompatActivity() {
 
     private fun loadTaehvFile(uri: Uri) {
         try {
-            // Copy the file to the app's cache directory for native access
-            val fileName =
-                    getFileNameFromUri(uri) ?: "taehv_${System.currentTimeMillis()}.safetensors"
-            if (!fileName.endsWith(".safetensors")) {
-                Toast.makeText(this, "Please select a .safetensors file", Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            val taehvDir = java.io.File(cacheDir, "taehv")
-            taehvDir.mkdirs()
-            val taehvFile = java.io.File(taehvDir, fileName)
-
-            contentResolver.openInputStream(uri)?.use { inputStream ->
-                taehvFile.outputStream().use { outputStream -> inputStream.copyTo(outputStream) }
-            }
-
+            val taehvFile =
+                    copyOpenableToCache(
+                            uri = uri,
+                            subdirectory = "taehv",
+                            fallbackFileName =
+                                    "taehv_${System.currentTimeMillis()}.safetensors",
+                            requiredSuffix = ".safetensors"
+                    )
             selectedTaehvPath = taehvFile.absolutePath
-            taehvLabel.text = fileName
+            taehvLabel.text = taehvFile.name
             clearTaehvButton.visibility = View.VISIBLE
             FileLogger.i(TAG, "TAEHV loaded: $selectedTaehvPath")
         } catch (e: Exception) {
@@ -469,7 +424,7 @@ class VideoGenerationActivity : AppCompatActivity() {
     }
 
     private fun startGeneration() {
-        if (generationJob?.isActive == true) {
+        if (generationController.isGenerating()) {
             Toast.makeText(this, R.string.video_status_generation_running, Toast.LENGTH_SHORT)
                     .show()
             return
@@ -487,7 +442,6 @@ class VideoGenerationActivity : AppCompatActivity() {
         val seed = parseSeedField() ?: return
         val flowShift = parseFlowShiftField() ?: return
 
-        // Get sampler and scheduler from spinners (using the same ordered list as initialization)
         val recommendedSamplers = SampleMethod.WAN_RECOMMENDED
         val otherSamplers =
                 SampleMethod.values().filter { it !in recommendedSamplers }
@@ -496,32 +450,8 @@ class VideoGenerationActivity : AppCompatActivity() {
         val selectedScheduler =
                 Scheduler.values()[schedulerSpinner.selectedItemPosition]
 
-        // Get LoRA path from file selector
-        val loraDir = selectedLoraPath
-        val taehvPath = selectedTaehvPath
-
-        // Get I2V strength
         val i2vStrength = i2vStrengthSeekBar.progress / 100.0f
-
-        // Calculate actual frames that will be generated (Wan formula)
-        val actualFrames = (framesCount - 1) / 4 * 4 + 1
-
-        // Check if we have enough memory
-        val isLowMem = isLowMemoryDevice()
-        val availMemMB = getAvailableMemoryMB()
-
-        FileLogger.separator("Video Generation Starting")
-        FileLogger.i(TAG, "Parameters:")
-        FileLogger.i(
-                TAG,
-                "  Size: ${width}x${height}, Frames: $framesCount (actual: $actualFrames), Steps: $steps"
-        )
-        FileLogger.i(TAG, "  CFG: $cfg, Seed: $seed, FlowShift: $flowShift")
-        FileLogger.i(TAG, "  Sampler: $selectedSampleMethod, Scheduler: $selectedScheduler")
-        FileLogger.i(TAG, "  LoRA: ${loraDir ?: "none"}")
-        FileLogger.i(TAG, "  TAEHV: ${taehvPath ?: "none"}")
-        FileLogger.i(TAG, "  I2V: ${initImageBitmap != null}, Strength: $i2vStrength")
-        FileLogger.i(TAG, "  Memory: isLowMem=$isLowMem, available=${availMemMB}MB")
+        val availMemMB = availableMemoryMb()
 
         if (availMemMB < 1500) {
             Toast.makeText(
@@ -532,176 +462,71 @@ class VideoGenerationActivity : AppCompatActivity() {
                     .show()
         }
 
-        // Prefer direct mode on capable devices; sequential mode is mainly for constrained memory.
-        val useSequentialLoad = isLowMem || availMemMB < 2500L
-
         updateProgressUI(0, "Preparing parameters...")
         generateButton.isEnabled = false
-
-        // Use Dispatchers.IO for native JNI operations - it has more threads for blocking
-        // operations
-        // Dispatchers.Default is CPU-bound and has limited parallelism (core count)
-        generationJob =
-                lifecycleScope.launch(Dispatchers.IO) {
-                    try {
-                        val prompt = promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
-
-                        // Log memory before generation
-                        FileLogger.i(TAG, "Logging memory state before generation...")
-                        logMemoryState("Before video generation")
-                        FileLogger.i(TAG, "Memory state logged.")
-
-                        FileLogger.i(TAG, "Preparing init image (if any)...")
-                        val resizedInitImage =
-                                initImageBitmap?.let { bmp ->
-                                    if (bmp.width != width || bmp.height != height) {
-                                        Bitmap.createScaledBitmap(bmp, width, height, true)
-                                    } else {
-                                        bmp
-                                    }
-                                }
-                        FileLogger.i(TAG, "Init image preparation done. hasInitImage=${resizedInitImage != null}")
-
-                        // Width must be between 256-960 for Wan 2.1
-                        FileLogger.i(TAG, "Constructing VideoGenerationRequest...")
-                        val params =
-                                VideoGenerationRequest(
-                                        prompt = prompt,
-                                        width = width,
-                                        height = height,
-                                        videoFrames = framesCount,
-                                        steps = steps,
-                                        cfgScale = cfg,
-                                        seed = seed,
-                                        flowShift = flowShift,
-                                        flashAttention = true,
-                                        forceSequentialLoad = useSequentialLoad,
-                                        sampleMethod = selectedSampleMethod,
-                                        scheduler = selectedScheduler,
-                                        loraModelDir = loraDir
-                                                        ?: getExternalFilesDir("loras")
-                                                                ?.absolutePath,
-                                        loraApplyMode = LoraApplyMode.AUTO,
-                                        taehv = taehvPath?.let(ModelSpec::localFile),
-                                        initImage = resizedInitImage,
-                                        strength = i2vStrength,
-                                        easyCache =
-                                                EasyCacheParams(
-                                                        enabled = true,
-                                                        reuseThreshold = 0.2f,
-                                                        startPercent = 0.15f,
-                                                        endPercent = 0.95f
-                                                )
-                                )
-                        FileLogger.i(TAG, "VideoGenerationRequest constructed.")
-                        FileLogger.i(
-                                TAG,
-                                "Generation mode: ${if (useSequentialLoad) "sequential" else "direct"} (isLowMem=$isLowMem, available=${availMemMB}MB)",
-                        )
-
-                        if (resizedInitImage != null) {
-                            FileLogger.i(
-                                    TAG,
-                                    "I2V mode: using init image ${resizedInitImage.width}x${resizedInitImage.height} with strength $i2vStrength"
-                            )
-                        }
-
-                        updateProgressUI(0, "Preparing model...")
-                        FileLogger.i(TAG, "Calling edge.image.generateVideo...")
-
-                        var frames: List<Bitmap> = emptyList()
-                        edge.image.generateVideo(params).collect { event ->
-                            when (event) {
-                                is GenerationStreamEvent.Progress -> {
-                                    val step = event.update
-                                    val status =
-                                            if (step.total > 0) "${step.message} (${step.current}/${step.total})"
-                                            else step.message
-                                    updateProgressUI(0, status)
-                                }
-                                is GenerationStreamEvent.Completed -> {
-                                    frames = event.frames
-                                }
-                            }
-                        }
-                        FileLogger.i(TAG, "edge.image.generateVideo returned ${frames.size} frames.")
-
-                        // Log memory after generation
-                        logMemoryState("After video generation")
-
-                        if (frames.isNotEmpty()) {
-                            withContext(Dispatchers.Main) {
-                                // Show metrics if available
-                                val metrics = edge.image.getLastGenerationMetrics()
-                                metrics?.let {
-                                    metricsLabel.text =
-                                            "Generated ${frames.size} frames in ${String.format("%.1f", it.totalTimeSeconds)}s"
-                                    metricsLabel.visibility = View.VISIBLE
-                                }
-
-                                // Store frames for GIF export
-                                generatedFrames = frames
+        generationController.start(
+                VideoGenerationConfig(
+                        prompt = promptInput.text.toString().ifBlank { DEFAULT_PROMPT },
+                        width = width,
+                        height = height,
+                        frames = framesCount,
+                        fps = fps,
+                        steps = steps,
+                        cfgScale = cfg,
+                        seed = seed,
+                        flowShift = flowShift,
+                        sampleMethod = selectedSampleMethod,
+                        scheduler = selectedScheduler,
+                        loraDirectory = selectedLoraPath,
+                        taehvPath = selectedTaehvPath,
+                        initImage = initImageBitmap,
+                        initImageStrength = i2vStrength,
+                        defaultLoraDirectory = getExternalFilesDir("loras")?.absolutePath,
+                ),
+                VideoGenerationCallbacks(
+                        onProgress = ::updateProgressUI,
+                        onCompleted = { result ->
+                            if (result.frames.isNotEmpty()) {
+                                metricsLabel.text =
+                                        result.metricsSummary ?: "Generated ${result.frames.size} frames"
+                                metricsLabel.visibility = View.VISIBLE
+                                generatedFrames = result.frames
                                 saveGifButton.visibility = View.VISIBLE
-
-                                // Start animation
-                                val frameDuration = 1000L / fps
-                                animationJob =
-                                        lifecycleScope.launch {
-                                            while (true) {
-                                                frames.forEach { frame ->
-                                                    previewImage.setImageBitmap(frame)
-                                                    kotlinx.coroutines.delay(frameDuration)
-                                                }
-                                            }
-                                        }
+                                startPreviewAnimation(result.frames, result.fps)
                             }
-                        }
-                        withContext(Dispatchers.Main) {
-                            updateProgressUI(
-                                    100,
-                                    getString(R.string.video_status_complete, frames.size)
-                            )
-                        }
-                    } catch (cancelled: CancellationException) {
-                        updateProgressUI(0, getString(R.string.video_status_cancelled))
-                    } catch (oom: OutOfMemoryError) {
-                        FileLogger.e(TAG, "Out of memory during generation", oom)
-                        logMemoryState("OOM error")
-                        updateProgressUI(
-                                0,
-                                getString(
-                                        R.string.video_status_failed,
-                                        "Out of memory. Close other apps and try again."
-                                )
-                        )
-                    } catch (t: Throwable) {
-                        FileLogger.e(TAG, "Failed during generation", t)
-                        val message = t.localizedMessage ?: "error"
-                        val finalMessage =
-                                if (message.contains(
-                                                "Failed to initialize Stable Diffusion context"
-                                        ) && selectedTaehvPath != null
-                                ) {
-                                    "$message\n\nTip: You selected a custom TAEHV. Ensure it is compatible with Wan2.1 (e.g. taew2_1.safetensors). Incompatible TAEHVs (like SDXL's) will cause this error."
-                                } else {
-                                    message
-                                }
-                        updateProgressUI(0, getString(R.string.video_status_failed, finalMessage))
-                    } finally {
-                        withContext(Dispatchers.Main) {
+                        },
+                        onFinished = {
                             progressBar.visibility = View.GONE
                             generateButton.isEnabled = true
-                            generationJob = null
-                        }
-                    }
-                }
+                        },
+                ),
+        )
     }
 
     private fun cancelGeneration() {
-        generationJob?.cancel()
         animationJob?.cancel()
-        edge.image.cancelGeneration()
+        generationController.cancel()
         updateProgressUI(0, getString(R.string.video_status_cancelled))
+    }
+
+    private fun startPreviewAnimation(frames: List<Bitmap>, fps: Int) {
+        animationJob?.cancel()
+        if (frames.isEmpty()) {
+            previewImage.setImageBitmap(null)
+            return
+        }
+
+        previewImage.setImageBitmap(frames.first())
+        val frameDuration = 1000L / fps
+        animationJob =
+                lifecycleScope.launch {
+                    while (true) {
+                        frames.forEach { frame ->
+                            previewImage.setImageBitmap(frame)
+                            kotlinx.coroutines.delay(frameDuration)
+                        }
+                    }
+                }
     }
 
     private fun updateProgressUI(percent: Int, status: String) {
@@ -808,7 +633,7 @@ class VideoGenerationActivity : AppCompatActivity() {
         super.onTrimMemory(level)
         if (TrimMemorySupport.isRunningLow(level)) {
             FileLogger.w(TAG, "System memory low (level=$level), cancelling if active")
-            if (generationJob?.isActive == true) {
+            if (generationController.isGenerating()) {
                 cancelGeneration()
                 runOnUiThread {
                     Toast.makeText(
@@ -824,46 +649,9 @@ class VideoGenerationActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        generationJob?.cancel()
+        generationController.cancel()
+        animationJob?.cancel()
         initImageBitmap?.recycle()
         initImageBitmap = null
-    }
-
-    private fun isLowMemoryDevice(): Boolean {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memInfo)
-        val totalRamGB = memInfo.totalMem / (1024L * 1024L * 1024L)
-        return totalRamGB < 8
-    }
-
-    private fun getAvailableMemoryMB(): Long {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memInfo)
-        return memInfo.availMem / BYTES_IN_MB
-    }
-
-    private fun logMemoryState(phase: String) {
-        val runtime = Runtime.getRuntime()
-        val heapUsed = (runtime.totalMemory() - runtime.freeMemory()) / BYTES_IN_MB
-        val heapMax = runtime.maxMemory() / BYTES_IN_MB
-
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        val systemAvail = memoryInfo.availMem / BYTES_IN_MB
-        val systemTotal = memoryInfo.totalMem / BYTES_IN_MB
-
-        FileLogger.i(TAG, "=== Memory: $phase ===")
-        FileLogger.i(TAG, "  Heap: ${heapUsed}MB / ${heapMax}MB max")
-        FileLogger.i(TAG, "  System: ${systemAvail}MB / ${systemTotal}MB total")
-
-        if (isOpenClAvailableCompat()) {
-            FileLogger.i(TAG, "  OpenCL: available")
-        }
-        LLMEdge.getVulkanDeviceInfo()?.let { vulkan ->
-            FileLogger.i(TAG, "  Vulkan: ${vulkan.freeMemoryMB}MB / ${vulkan.totalMemoryMB}MB")
-        }
     }
 }

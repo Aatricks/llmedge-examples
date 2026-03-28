@@ -1,7 +1,5 @@
 package com.example.llmedgeexample
 
-import android.app.ActivityManager
-import android.content.Context
 import android.os.Bundle
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -31,7 +29,6 @@ class LocalAssetDemoActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "LocalAssetDemoActivity"
-        private const val BYTES_IN_MB = 1024L * 1024L
         private const val GENERATION_TIMEOUT_MS = 60_000L // 60 seconds
     }
 
@@ -71,10 +68,10 @@ class LocalAssetDemoActivity : AppCompatActivity() {
                 }
 
                 // Log memory state
-                logMemoryState("Before model load")
+                logDemoMemoryState(TAG, "Before model load")
 
                 // Check available memory
-                val availMemMB = getAvailableMemoryMB()
+                val availMemMB = availableMemoryMb()
                 if (availMemMB < 1500) {
                     withContext(Dispatchers.Main) {
                         output.append("Warning: Low memory (${availMemMB}MB). May experience issues.\n\n")
@@ -115,7 +112,7 @@ class LocalAssetDemoActivity : AppCompatActivity() {
                     }
                 } catch (oom: OutOfMemoryError) {
                     android.util.Log.e(TAG, "OOM during blocking generation", oom)
-                    logMemoryState("OOM error")
+                    logDemoMemoryState(TAG, "OOM error")
                     withContext(Dispatchers.Main) {
                         output.append("\nBlocking failed: Out of memory\n")
                     }
@@ -163,7 +160,7 @@ class LocalAssetDemoActivity : AppCompatActivity() {
                 val streamingMetrics = if (ok) edge.text.getLastGenerationMetrics() else null
                 val afterStream = MemoryMetrics.snapshot(this@LocalAssetDemoActivity)
                 
-                logMemoryState("After streaming")
+                logDemoMemoryState(TAG, "After streaming")
                 
                 withContext(Dispatchers.Main) {
                     output.append(if (ok) "\n\n[done]\n\n" else "\n\n[stream failed or timed out]\n\n")
@@ -202,27 +199,5 @@ class LocalAssetDemoActivity : AppCompatActivity() {
         val throughput = String.format(Locale.US, "%.2f", metrics.tokensPerSecond)
         val duration = String.format(Locale.US, "%.2f", metrics.elapsedSeconds)
         return "tokens=${metrics.tokenCount} | $throughput tok/s | $duration s"
-    }
-
-    private fun getAvailableMemoryMB(): Long {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memInfo)
-        return memInfo.availMem / BYTES_IN_MB
-    }
-
-    private fun logMemoryState(phase: String) {
-        val runtime = Runtime.getRuntime()
-        val heapUsed = (runtime.totalMemory() - runtime.freeMemory()) / BYTES_IN_MB
-        val heapMax = runtime.maxMemory() / BYTES_IN_MB
-
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        val systemAvail = memoryInfo.availMem / BYTES_IN_MB
-
-        android.util.Log.i(TAG, "=== Memory: $phase ===")
-        android.util.Log.i(TAG, "  Heap: ${heapUsed}MB / ${heapMax}MB max")
-        android.util.Log.i(TAG, "  System: ${systemAvail}MB available")
     }
 }
