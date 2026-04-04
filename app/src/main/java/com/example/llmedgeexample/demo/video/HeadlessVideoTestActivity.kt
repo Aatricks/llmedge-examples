@@ -3,6 +3,7 @@ package com.example.llmedgeexample.demo.video
 import android.app.Activity
 import android.os.Bundle
 import android.util.Log
+import io.aatricks.llmedge.ImageRuntimeConfig
 import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.LLMEdgeConfig
 import io.aatricks.llmedge.image.diffusion.EasyCacheParams
@@ -124,7 +125,7 @@ class HeadlessVideoTestActivity : Activity() {
                     LLMEdge.create(
                             applicationContext,
                             scope,
-                            LLMEdgeConfig(preferPerformanceMode = preferPerformanceMode),
+                            LLMEdgeConfig(image = ImageRuntimeConfig(preferPerformanceMode = preferPerformanceMode)),
                     )
             val params =
                     VideoGenerationRequest(

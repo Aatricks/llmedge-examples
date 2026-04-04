@@ -7,10 +7,6 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Bundle
 import android.view.View
-import android.widget.Button
-import android.widget.ProgressBar
-import android.widget.ScrollView
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -19,8 +15,6 @@ import androidx.lifecycle.lifecycleScope
 import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
 import io.aatricks.llmedge.speech.stt.Whisper
-import io.aatricks.llmedge.huggingface.HuggingFaceHub
-import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -50,15 +44,8 @@ class TranscriptionActivity : AppCompatActivity() {
         private const val HUGGING_FACE_MODEL_ID = "ggerganov/whisper.cpp"
     }
 
-    private val statusLabel: TextView by lazy { findViewById(R.id.transcriptionStatusLabel) }
-    private val transcriptionText: TextView by lazy { findViewById(R.id.transcriptionText) }
-    private val transcriptionScroll: ScrollView by lazy { findViewById(R.id.transcriptionScroll) }
-    private val progressBar: ProgressBar by lazy { findViewById(R.id.transcriptionProgressBar) }
-    private val recordButton: Button by lazy { findViewById(R.id.btnStartRecording) }
-    private val stopButton: Button by lazy { findViewById(R.id.btnStopRecording) }
-    private val transcribeButton: Button by lazy { findViewById(R.id.btnTranscribe) }
-    private val downloadButton: Button by lazy { findViewById(R.id.btnDownloadModel) }
-    private val languageLabel: TextView by lazy { findViewById(R.id.detectedLanguageLabel) }
+    private val views by lazy(LazyThreadSafetyMode.NONE) { TranscriptionViews.bind(this) }
+    private val controller by lazy(LazyThreadSafetyMode.NONE) { TranscriptionController(lifecycleScope) }
 
     private var whisper: Whisper? = null
     private var audioRecord: AudioRecord? = null
@@ -85,7 +72,7 @@ class TranscriptionActivity : AppCompatActivity() {
     }
 
     private fun setupButtons() {
-        recordButton.setOnClickListener {
+        views.recordButton.setOnClickListener {
             if (checkMicrophonePermission()) {
                 startRecording()
             } else {
@@ -93,9 +80,9 @@ class TranscriptionActivity : AppCompatActivity() {
             }
         }
 
-        stopButton.setOnClickListener { stopRecording() }
+        views.stopButton.setOnClickListener { stopRecording() }
 
-        transcribeButton.setOnClickListener {
+        views.transcribeButton.setOnClickListener {
             if (recordedSamples.isNotEmpty()) {
                 transcribeRecordedAudio()
             } else {
@@ -103,11 +90,11 @@ class TranscriptionActivity : AppCompatActivity() {
             }
         }
 
-        downloadButton.setOnClickListener { downloadModel() }
+        views.downloadButton.setOnClickListener { downloadModel() }
 
         // Initial button states
-        stopButton.isEnabled = false
-        transcribeButton.isEnabled = false
+        views.stopButton.isEnabled = false
+        views.transcribeButton.isEnabled = false
     }
 
     private fun checkMicrophonePermission(): Boolean {
@@ -116,86 +103,65 @@ class TranscriptionActivity : AppCompatActivity() {
     }
 
     private fun checkModelAvailability() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val modelFile = File(filesDir, DEFAULT_MODEL_FILE)
-            val modelExists = modelFile.exists()
-
-            withContext(Dispatchers.Main) {
-                if (modelExists) {
-                    statusLabel.text = "Model ready: ${modelFile.name}"
-                    downloadButton.visibility = View.GONE
-                    loadModel(modelFile.absolutePath)
-                } else {
-                    statusLabel.text = "Model not found. Please download."
-                    downloadButton.visibility = View.VISIBLE
-                    recordButton.isEnabled = false
-                }
+        controller.checkModelAvailability(filesDir, DEFAULT_MODEL_FILE) { result ->
+            if (result.exists) {
+                views.statusLabel.text = "Model ready: ${result.modelFile.name}"
+                views.downloadButton.visibility = View.GONE
+                loadModel(result.modelFile.absolutePath)
+            } else {
+                views.statusLabel.text = "Model not found. Please download."
+                views.downloadButton.visibility = View.VISIBLE
+                views.recordButton.isEnabled = false
             }
         }
     }
 
     private fun downloadModel() {
-        downloadButton.isEnabled = false
-        progressBar.visibility = View.VISIBLE
-        progressBar.isIndeterminate = true
-        statusLabel.text = "Downloading model..."
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val result = HuggingFaceHub.ensureModelOnDisk(
-                    context = applicationContext,
-                    modelId = HUGGING_FACE_MODEL_ID,
-                    filename = DEFAULT_MODEL_FILE
-                )
-                val modelPath = result.file.absolutePath
-
-                withContext(Dispatchers.Main) {
-                    statusLabel.text = "Model downloaded!"
-                    progressBar.visibility = View.GONE
-                    downloadButton.visibility = View.GONE
-                    loadModel(modelPath)
-                }
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "Failed to download model", e)
-                withContext(Dispatchers.Main) {
-                    statusLabel.text = "Download failed: ${e.message}"
-                    progressBar.visibility = View.GONE
-                    downloadButton.isEnabled = true
-                }
-            }
-        }
+        controller.downloadModel(
+            context = applicationContext,
+            modelId = HUGGING_FACE_MODEL_ID,
+            filename = DEFAULT_MODEL_FILE,
+            onStarted = {
+                views.downloadButton.isEnabled = false
+                views.progressBar.visibility = View.VISIBLE
+                views.progressBar.isIndeterminate = true
+                views.statusLabel.text = "Downloading model..."
+            },
+            onCompleted = { modelPath ->
+                views.statusLabel.text = "Model downloaded!"
+                views.progressBar.visibility = View.GONE
+                views.downloadButton.visibility = View.GONE
+                loadModel(modelPath)
+            },
+            onError = { message ->
+                android.util.Log.e(TAG, "Failed to download model: $message")
+                views.statusLabel.text = "Download failed: $message"
+                views.progressBar.visibility = View.GONE
+                views.downloadButton.isEnabled = true
+            },
+        )
     }
 
     private fun loadModel(modelPath: String) {
-        progressBar.visibility = View.VISIBLE
-        progressBar.isIndeterminate = true
-        statusLabel.text = "Loading model..."
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                whisper =
-                        Whisper.load(
-                                modelPath = modelPath,
-                                useGpu = false, // Force CPU for predictable behavior on all devices
-                                flashAttn = true
-                        )
-
-                val modelType = whisper?.getModelType() ?: "unknown"
-                val isMultilingual = whisper?.isMultilingual() ?: false
-
-                withContext(Dispatchers.Main) {
-                    statusLabel.text = "Model loaded: $modelType (multilingual: $isMultilingual)"
-                    progressBar.visibility = View.GONE
-                    recordButton.isEnabled = true
-                }
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "Failed to load model", e)
-                withContext(Dispatchers.Main) {
-                    statusLabel.text = "Failed to load model: ${e.message}"
-                    progressBar.visibility = View.GONE
-                }
-            }
-        }
+        controller.loadModel(
+            modelPath = modelPath,
+            onStarted = {
+                views.progressBar.visibility = View.VISIBLE
+                views.progressBar.isIndeterminate = true
+                views.statusLabel.text = "Loading model..."
+            },
+            onCompleted = { loadedWhisper, modelType, multilingual ->
+                whisper = loadedWhisper
+                views.statusLabel.text = "Model loaded: $modelType (multilingual: $multilingual)"
+                views.progressBar.visibility = View.GONE
+                views.recordButton.isEnabled = true
+            },
+            onError = { message ->
+                android.util.Log.e(TAG, "Failed to load model: $message")
+                views.statusLabel.text = "Failed to load model: $message"
+                views.progressBar.visibility = View.GONE
+            },
+        )
     }
 
     private fun startRecording() {
@@ -225,10 +191,10 @@ class TranscriptionActivity : AppCompatActivity() {
             isRecording = true
             audioRecord?.startRecording()
 
-            recordButton.isEnabled = false
-            stopButton.isEnabled = true
-            transcribeButton.isEnabled = false
-            statusLabel.text = "Recording..."
+            views.recordButton.isEnabled = false
+            views.stopButton.isEnabled = true
+            views.transcribeButton.isEnabled = false
+            views.statusLabel.text = "Recording..."
 
             recordingJob =
                     lifecycleScope.launch(Dispatchers.IO) {
@@ -253,7 +219,7 @@ class TranscriptionActivity : AppCompatActivity() {
                                 val durationSeconds =
                                         recordedSamples.size / Whisper.SAMPLE_RATE.toFloat()
                                 withContext(Dispatchers.Main) {
-                                    statusLabel.text =
+                                    views.statusLabel.text =
                                             "Recording: ${String.format("%.1f", durationSeconds)}s"
                                 }
                             }
@@ -272,14 +238,14 @@ class TranscriptionActivity : AppCompatActivity() {
         audioRecord?.release()
         audioRecord = null
 
-        recordButton.isEnabled = true
-        stopButton.isEnabled = false
+        views.recordButton.isEnabled = true
+        views.stopButton.isEnabled = false
 
         val durationSeconds = recordedSamples.size / Whisper.SAMPLE_RATE.toFloat()
-        statusLabel.text = "Recorded ${String.format("%.1f", durationSeconds)}s of audio"
+        views.statusLabel.text = "Recorded ${String.format("%.1f", durationSeconds)}s of audio"
 
         if (recordedSamples.isNotEmpty()) {
-            transcribeButton.isEnabled = true
+            views.transcribeButton.isEnabled = true
         }
     }
 
@@ -291,94 +257,59 @@ class TranscriptionActivity : AppCompatActivity() {
             return
         }
 
-        transcribeButton.isEnabled = false
-        progressBar.visibility = View.VISIBLE
-        progressBar.isIndeterminate = false
-        progressBar.progress = 0
-        progressBar.max = 100
-        transcriptionText.text = ""
-        statusLabel.text = "Transcribing..."
+        val whisperInstance = whisper ?: run {
+            Toast.makeText(this, "Model not loaded", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        transcriptionJob =
-                lifecycleScope.launch(Dispatchers.IO) {
-                    try {
-                        val whisperInstance =
-                                whisper ?: throw IllegalStateException("Model not loaded")
+        views.transcribeButton.isEnabled = false
+        views.progressBar.visibility = View.VISIBLE
+        views.progressBar.isIndeterminate = false
+        views.progressBar.progress = 0
+        views.progressBar.max = 100
+        views.transcriptionText.text = ""
+        views.statusLabel.text = "Transcribing..."
 
-                        // Set up callbacks for real-time updates
-                        whisperInstance.setProgressCallback { progress ->
-                            lifecycleScope.launch(Dispatchers.Main) {
-                                progressBar.progress = progress
+        controller.transcribe(
+            whisper = whisperInstance,
+            samples = samples,
+            callbacks =
+                TranscriptionCallbacks(
+                    onProgress = { progress -> views.progressBar.progress = progress },
+                    onSegment = { chunk ->
+                        views.transcriptionText.append(chunk)
+                        views.transcriptionScroll.post {
+                            views.transcriptionScroll.fullScroll(View.FOCUS_DOWN)
+                        }
+                    },
+                    onCompleted = { segments, langId ->
+                        views.progressBar.visibility = View.GONE
+                        views.statusLabel.text = "Transcription complete: ${segments.size} segments"
+                        if (langId != null) {
+                            views.languageLabel.text = "Detected language: $langId"
+                            views.languageLabel.visibility = View.VISIBLE
+                        }
+                        views.transcriptionText.text =
+                            segments.joinToString("\n") { segment ->
+                                "[${segment.startTimeMs}ms - ${segment.endTimeMs}ms] ${segment.text}"
                             }
-                        }
-
-                        whisperInstance.setSegmentCallback { index, startTime, endTime, text ->
-                            lifecycleScope.launch(Dispatchers.Main) {
-                                val startMs = startTime * 10
-                                val endMs = endTime * 10
-                                transcriptionText.append("[$startMs-$endMs] $text\n")
-                                transcriptionScroll.post {
-                                    transcriptionScroll.fullScroll(View.FOCUS_DOWN)
-                                }
-                            }
-                        }
-
-                        // Perform transcription
-                        val segments =
-                                whisperInstance.transcribe(
-                                        samples = samples,
-                                        params =
-                                                Whisper.TranscribeParams(
-                                                        nThreads =
-                                                                Runtime.getRuntime()
-                                                                        .availableProcessors()
-                                                                        .coerceAtMost(4),
-                                                        tokenTimestamps = true,
-                                                        printProgress = false
-                                                )
-                                )
-
-                        // Detect language
-                        val langId = whisperInstance.detectLanguage(samples)
-
-                        withContext(Dispatchers.Main) {
-                            progressBar.visibility = View.GONE
-                            statusLabel.text = "Transcription complete: ${segments.size} segments"
-
-                            if (langId != null) {
-                                languageLabel.text = "Detected language: $langId"
-                                languageLabel.visibility = View.VISIBLE
-                            }
-
-                            // Show full transcription
-                            transcriptionText.text =
-                                    segments.joinToString("\n") { segment ->
-                                        "[${segment.startTimeMs}ms - ${segment.endTimeMs}ms] ${segment.text}"
-                                    }
-
-                            transcribeButton.isEnabled = true
-                        }
-                    } catch (cancelled: CancellationException) {
-                        withContext(Dispatchers.Main) {
-                            statusLabel.text = "Transcription cancelled"
-                            progressBar.visibility = View.GONE
-                            transcribeButton.isEnabled = true
-                        }
-                    } catch (e: Exception) {
-                        android.util.Log.e(TAG, "Transcription failed", e)
-                        withContext(Dispatchers.Main) {
-                            statusLabel.text = "Transcription failed: ${e.message}"
-                            progressBar.visibility = View.GONE
-                            transcribeButton.isEnabled = true
-                        }
-                    }
-                }
+                    },
+                    onError = { message ->
+                        views.statusLabel.text = message
+                        views.progressBar.visibility = View.GONE
+                    },
+                    onFinished = {
+                        views.transcribeButton.isEnabled = true
+                    },
+                ),
+        )
     }
 
     override fun onDestroy() {
         super.onDestroy()
         stopRecording()
         transcriptionJob?.cancel()
+        controller.cancel()
         whisper?.close()
         whisper = null
     }

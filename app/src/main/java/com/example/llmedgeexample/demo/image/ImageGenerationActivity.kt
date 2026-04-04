@@ -4,13 +4,7 @@ import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
 import android.os.Bundle
 import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageView
-import android.widget.ProgressBar
-import android.widget.TextView
 import android.widget.Toast
-import android.widget.Switch
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
@@ -43,19 +37,7 @@ class ImageGenerationActivity : AppCompatActivity() {
         private const val DEFAULT_SEED = -1L
     }
 
-    private val promptInput: EditText by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.videoPromptInput) }
-    private val widthInput: EditText by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.imageWidthInput) }
-    private val heightInput: EditText by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.imageHeightInput) }
-    private val stepsInput: EditText by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.imageStepsInput) }
-    private val cfgInput: EditText by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.imageCfgInput) }
-    private val seedInput: EditText by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.imageSeedInput) }
-    private val generateButton: Button by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.btnGenerateVideo) }
-    private val cancelButton: Button by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.btnCancelVideo) }
-    private val progressBar: ProgressBar by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.videoProgressBar) }
-    private val progressLabel: TextView by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.videoProgressLabel) }
-    private val previewImage: ImageView by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.videoPreview) }
-    private val metricsLabel: TextView by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.videoMetricsLabel) }
-    private val loraToggle: Switch by lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.loraToggle) }
+    private val views by lazy(LazyThreadSafetyMode.NONE) { ImageGenerationViews.bind(this) }
 
     private val edge by lazy(LazyThreadSafetyMode.NONE) {
         bindEdge(this, this, lifecycleScope, preferPerformanceMode = true)
@@ -74,16 +56,16 @@ class ImageGenerationActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_image_generation) // Use image-specific layout
 
-        generateButton.text = "Generate Image"
+        views.generateButton.text = "Generate Image"
 
-        progressBar.max = 100
-        progressBar.progress = 0
-        progressBar.visibility = View.GONE
+        views.progressBar.max = 100
+        views.progressBar.progress = 0
+        views.progressBar.visibility = View.GONE
 
-        generateButton.setOnClickListener { startGeneration() }
-        cancelButton.setOnClickListener { cancelGeneration() }
+        views.generateButton.setOnClickListener { startGeneration() }
+        views.cancelButton.setOnClickListener { cancelGeneration() }
 
-        loraToggle.setOnCheckedChangeListener { _, isChecked ->
+        views.loraToggle.setOnCheckedChangeListener { _, isChecked ->
             // Optionally, provide feedback to the user or log the state change
             if (isChecked) {
                 Toast.makeText(this, "Detail Tweaker LoRA Enabled", Toast.LENGTH_SHORT).show()
@@ -102,11 +84,11 @@ class ImageGenerationActivity : AppCompatActivity() {
             return
         }
 
-        val width = parseDimensionField(widthInput, DEFAULT_WIDTH, "Width") ?: return
-        val height = parseDimensionField(heightInput, DEFAULT_HEIGHT, "Height") ?: return
-        val steps = parseStepsField() ?: return
-        val cfg = parseCfgField() ?: return
-        val seed = parseSeedField() ?: return
+        val width = ImageGenerationFormSupport.parseDimensionField(views.widthInput, DEFAULT_WIDTH, "Width") ?: return
+        val height = ImageGenerationFormSupport.parseDimensionField(views.heightInput, DEFAULT_HEIGHT, "Height") ?: return
+        val steps = ImageGenerationFormSupport.parseStepsField(views.stepsInput, DEFAULT_STEPS) ?: return
+        val cfg = ImageGenerationFormSupport.parseCfgField(views.cfgInput, DEFAULT_CFG) ?: return
+        val seed = ImageGenerationFormSupport.parseSeedField(views.seedInput, DEFAULT_SEED) ?: return
 
         // Check available memory
         val availMemMB = availableMemoryMb()
@@ -121,11 +103,11 @@ class ImageGenerationActivity : AppCompatActivity() {
         }
 
         updateProgressUI(0, "Loading model...")
-        progressBar.visibility = View.VISIBLE
-        progressBar.isIndeterminate = true
-        generateButton.isEnabled = false
-        val prompt = promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
-        val loraRequested = loraToggle.isChecked
+        views.progressBar.visibility = View.VISIBLE
+        views.progressBar.isIndeterminate = true
+        views.generateButton.isEnabled = false
+        val prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
+        val loraRequested = views.loraToggle.isChecked
 
         val useFlashAttn = width >= 512 && height >= 512
         val baseRequest =
@@ -182,7 +164,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                                 onProgress = ::updateProgressUI,
                                 onCompleted = { result ->
                                     logDemoMemoryState(TAG, "After image generation", includeGpu = true)
-                                    previewImage.setImageBitmap(result.bitmap)
+                                    views.previewImage.setImageBitmap(result.bitmap)
                                     result.metrics?.imageRequestMetrics?.let { imageMetrics ->
                                         android.util.Log.i(
                                             TAG,
@@ -193,8 +175,8 @@ class ImageGenerationActivity : AppCompatActivity() {
                                         )
                                     }
                                     val metricsText = result.metrics?.let(::formatMetricsText) ?: ""
-                                    metricsLabel.text = metricsText.ifBlank { "No metrics available" }
-                                    metricsLabel.visibility = View.VISIBLE
+                                    views.metricsLabel.text = metricsText.ifBlank { "No metrics available" }
+                                    views.metricsLabel.visibility = View.VISIBLE
                                     updateProgressUI(100, "Complete. $metricsText")
                                 },
                                 onCancelled = { requestId, reason, phase ->
@@ -207,22 +189,22 @@ class ImageGenerationActivity : AppCompatActivity() {
                                     }
                                 },
                                 onFinished = {
-                                    progressBar.visibility = View.GONE
-                                    generateButton.isEnabled = true
+                                    views.progressBar.visibility = View.GONE
+                                    views.generateButton.isEnabled = true
                                 },
                             ),
                     )
                 } catch (_: CancellationException) {
                     if (!controller.isGenerating() && !isDestroyed) {
-                        generateButton.isEnabled = true
+                        views.generateButton.isEnabled = true
                         updateProgressUI(0, "Cancelled: user cancelled")
-                        progressBar.visibility = View.GONE
+                        views.progressBar.visibility = View.GONE
                     }
                 } catch (t: Throwable) {
                     android.util.Log.e(TAG, "Failed to prepare image request", t)
                     if (!isDestroyed) {
-                        progressBar.visibility = View.GONE
-                        generateButton.isEnabled = true
+                        views.progressBar.visibility = View.GONE
+                        views.generateButton.isEnabled = true
                         Toast.makeText(
                             this@ImageGenerationActivity,
                             "Failed to prepare request: ${t.localizedMessage ?: "unknown error"}",
@@ -245,12 +227,7 @@ class ImageGenerationActivity : AppCompatActivity() {
 
     private fun updateProgressUI(percent: Int, status: String) {
         runOnUiThread {
-            progressBar.visibility = View.VISIBLE
-            progressBar.isIndeterminate = percent == 0
-            if (!progressBar.isIndeterminate) {
-                progressBar.progress = percent
-            }
-            progressLabel.text = status
+            GenerationDemoSupport.updateProgress(views.progressBar, views.progressLabel, percent, status)
         }
     }
 
@@ -266,54 +243,6 @@ class ImageGenerationActivity : AppCompatActivity() {
     }
 
     private fun formatDuration(durationMs: Long): String = String.format("%.2fs", durationMs / 1000f)
-
-    private fun parseDimensionField(field: EditText, defaultValue: Int, label: String): Int? {
-        val value = field.text.toString().ifBlank { defaultValue.toString() }.toIntOrNull()
-        return if (value == null || value !in 128..1024 || value % 8 != 0) {
-            field.error = "$label must be a multiple of 8 between 128 and 1024"
-            field.requestFocus()
-            null
-        } else {
-            field.error = null
-            value
-        }
-    }
-
-    private fun parseStepsField(): Int? {
-        val value = stepsInput.text.toString().ifBlank { DEFAULT_STEPS.toString() }.toIntOrNull()
-        return if (value == null || value !in 1..50) {
-            stepsInput.error = "Steps must be between 1 and 50"
-            stepsInput.requestFocus()
-            null
-        } else {
-            stepsInput.error = null
-            value
-        }
-    }
-
-    private fun parseCfgField(): Float? {
-        val value = cfgInput.text.toString().ifBlank { DEFAULT_CFG.toString() }.toFloatOrNull()
-        return if (value == null || value !in 1.0f..15.0f) {
-            cfgInput.error = "CFG must be between 1.0 and 15.0"
-            cfgInput.requestFocus()
-            null
-        } else {
-            cfgInput.error = null
-            value
-        }
-    }
-
-    private fun parseSeedField(): Long? {
-        val value = seedInput.text.toString().ifBlank { DEFAULT_SEED.toString() }.toLongOrNull()
-        return if (value == null || value < -1L) {
-            seedInput.error = "Seed must be -1 or non-negative"
-            seedInput.requestFocus()
-            null
-        } else {
-            seedInput.error = null
-            value
-        }
-    }
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)

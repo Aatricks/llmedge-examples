@@ -2,8 +2,10 @@ package com.example.llmedgeexample.common
 
 import android.content.Context
 import androidx.lifecycle.LifecycleOwner
+import io.aatricks.llmedge.ImageRuntimeConfig
 import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.LLMEdgeConfig
+import io.aatricks.llmedge.TextRuntimeConfig
 import io.aatricks.llmedge.VulkanDeviceInfo
 import io.aatricks.llmedge.lifecycle.LLMEdgeLifecycle
 import kotlinx.coroutines.CoroutineScope
@@ -24,8 +26,8 @@ fun bindEdge(
             scope = scope,
             config =
                 LLMEdgeConfig(
-                    preferPerformanceMode = preferPerformanceMode && !isCpuOnlyForced(context),
-                    textUseVulkan = !isCpuOnlyForced(context),
+                    text = TextRuntimeConfig(useVulkan = !isCpuOnlyForced(context)),
+                    image = ImageRuntimeConfig(preferPerformanceMode = preferPerformanceMode && !isCpuOnlyForced(context)),
                 ),
         ),
     )
