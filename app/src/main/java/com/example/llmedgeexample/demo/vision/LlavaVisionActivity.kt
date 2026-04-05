@@ -16,6 +16,8 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
 import io.aatricks.llmedge.LLMEdge
+import io.aatricks.llmedge.vision.VisionPrepareRequest
+import io.aatricks.llmedge.vision.VisionRequest
 import io.aatricks.llmedge.vision.ImageSource
 import io.aatricks.llmedge.vision.ImageUtils
 import io.aatricks.llmedge.vision.LocalImageDescriber
@@ -137,7 +139,12 @@ class LlavaVisionActivity : AppCompatActivity() {
                         progress.visibility = View.VISIBLE
                         tvResult.text = "Image ready. Warming vision model..."
                     }
-                    edge.vision.prepare()
+                    edge.vision.prepare(
+                        VisionPrepareRequest(
+                            model = edge.config.models.vision.model,
+                            projector = edge.config.models.vision.projector,
+                        ),
+                    )
                     if (currentVersion != selectionVersion) return@launch
                     runOnUiThread {
                         progress.visibility = View.GONE
@@ -264,7 +271,14 @@ class LlavaVisionActivity : AppCompatActivity() {
                     )
 
                 val resultText =
-                    edge.vision.analyze(bitmap, finalPrompt) { status ->
+                    edge.vision.analyze(
+                        VisionRequest(
+                            image = bitmap,
+                            prompt = finalPrompt,
+                            model = edge.config.models.vision.model,
+                            projector = edge.config.models.vision.projector,
+                        ),
+                    ) { status ->
                         runOnUiThread {
                             tvResult.text = status
                         }

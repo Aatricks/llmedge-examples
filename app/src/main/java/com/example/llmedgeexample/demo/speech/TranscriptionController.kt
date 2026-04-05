@@ -5,7 +5,10 @@ import io.aatricks.llmedge.model.ModelArtifactKind
 import io.aatricks.llmedge.model.ModelCapability
 import io.aatricks.llmedge.model.ModelHints
 import io.aatricks.llmedge.model.ModelSpec
-import io.aatricks.llmedge.speech.WhisperLoadOptions
+import io.aatricks.llmedge.speech.SpeechLanguageDetectionRequest
+import io.aatricks.llmedge.speech.SpeechToTextPrepareRequest
+import io.aatricks.llmedge.speech.SpeechToTextRequest
+import io.aatricks.llmedge.speech.WhisperRuntimeRequest
 import io.aatricks.llmedge.speech.stt.Whisper
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -89,8 +92,10 @@ internal class TranscriptionController(
         scope.launch(ioDispatcher) {
             try {
                 edge.speech.prepareSpeechToText(
-                    model = model,
-                    loadOptions = WhisperLoadOptions(useGpu = false),
+                    SpeechToTextPrepareRequest(
+                        model = model,
+                        runtime = WhisperRuntimeRequest(gpuEnabled = false),
+                    ),
                 )
                 withContext(mainDispatcher) {
                     onCompleted()
@@ -116,15 +121,17 @@ internal class TranscriptionController(
                     withContext(mainDispatcher) { callbacks.onProgress(5) }
                     val segments =
                         edge.speech.transcribe(
-                            audioSamples = samples,
-                            model = model,
-                            params =
-                                Whisper.TranscribeParams(
-                                    nThreads = Runtime.getRuntime().availableProcessors().coerceAtMost(4),
-                                    tokenTimestamps = true,
-                                    printProgress = false,
-                                ),
-                            loadOptions = WhisperLoadOptions(useGpu = false),
+                            SpeechToTextRequest(
+                                audioSamples = samples,
+                                model = model,
+                                params =
+                                    Whisper.TranscribeParams(
+                                        nThreads = Runtime.getRuntime().availableProcessors().coerceAtMost(4),
+                                        tokenTimestamps = true,
+                                        printProgress = false,
+                                    ),
+                                runtime = WhisperRuntimeRequest(gpuEnabled = false),
+                            ),
                         )
                     withContext(mainDispatcher) {
                         segments.forEach { segment ->
@@ -134,9 +141,11 @@ internal class TranscriptionController(
                     }
                     val lang =
                         edge.speech.detectLanguage(
-                            audioSamples = samples,
-                            model = model,
-                            loadOptions = WhisperLoadOptions(useGpu = false),
+                            SpeechLanguageDetectionRequest(
+                                audioSamples = samples,
+                                model = model,
+                                runtime = WhisperRuntimeRequest(gpuEnabled = false),
+                            ),
                         )
                     withContext(mainDispatcher) {
                         callbacks.onProgress(100)

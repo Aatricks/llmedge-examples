@@ -2,7 +2,8 @@ package com.example.llmedgeexample.demo.speech
 
 import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.speech.AudioStreamEvent
-import io.aatricks.llmedge.speech.BarkLoadOptions
+import io.aatricks.llmedge.speech.BarkRuntimeRequest
+import io.aatricks.llmedge.speech.SpeechSynthesisRequest
 import io.aatricks.llmedge.speech.tts.BarkTTS
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -48,14 +49,17 @@ internal class TTSController(
                     val startTime = System.currentTimeMillis()
                     var result: BarkTTS.AudioResult? = null
                     edge.speech.synthesizeStream(
-                        text = text,
-                        params = BarkTTS.GenerateParams(nThreads = Runtime.getRuntime().availableProcessors()),
-                        loadOptions =
-                            BarkLoadOptions(
-                                seed = 0,
-                                temperature = 0.7f,
-                                fineTemperature = 0.5f,
-                            ),
+                        SpeechSynthesisRequest(
+                            text = text,
+                            model = edge.config.models.textToSpeech,
+                            params = BarkTTS.GenerateParams(nThreads = Runtime.getRuntime().availableProcessors()),
+                            runtime =
+                                BarkRuntimeRequest(
+                                    seed = 0,
+                                    temperature = 0.7f,
+                                    fineTemperature = 0.5f,
+                                ),
+                        ),
                     ).collect { event ->
                         when (event) {
                             AudioStreamEvent.Started -> Unit

@@ -130,7 +130,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                     val prepared =
                         withContext(Dispatchers.IO) {
                             requestPreparer.prepare(
-                                context = this@ImageGenerationActivity,
+                                edge = edge,
                                 baseRequest = baseRequest,
                                 loraRequested = loraRequested,
                                 onStatus = { status -> updateProgressUI(0, status) },

@@ -2,10 +2,14 @@ package com.example.llmedgeexample.samples
 
 import android.content.Context
 import android.graphics.Bitmap
-import io.aatricks.llmedge.image.diffusion.StableDiffusion
-import io.aatricks.llmedge.image.diffusion.GenerateParams
-import io.aatricks.llmedge.image.diffusion.VideoGenerateParams
+import io.aatricks.llmedge.LLMEdge
+import io.aatricks.llmedge.image.ImageGenerationRequest
+import io.aatricks.llmedge.image.VideoGenerationRequest
+import io.aatricks.llmedge.model.ModelSpec
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collect
 
 object SimpleGenerator {
     suspend fun generate(
@@ -17,11 +21,24 @@ object SimpleGenerator {
     ): File {
         if (!outputDir.exists()) outputDir.mkdirs()
 
-        val sd = StableDiffusion.load(context, modelId = modelId)
+        val edge =
+            LLMEdge.create(
+                context = context,
+                scope = CoroutineScope(SupervisorJob()),
+            )
         try {
             if (isVideo) {
-                val params = VideoGenerateParams(prompt = prompt)
-                val frames = sd.txt2vid(params)
+                var frames: List<Bitmap> = emptyList()
+                edge.image.generateVideo(
+                    VideoGenerationRequest(
+                        prompt = prompt,
+                        model = ModelSpec.huggingFace(repoId = modelId),
+                    ),
+                ).collect { event ->
+                    if (event is io.aatricks.llmedge.image.GenerationStreamEvent.Completed) {
+                        frames = event.frames
+                    }
+                }
                 val outputFile = File(outputDir, "video_${System.currentTimeMillis()}.png")
 
                 frames.firstOrNull()?.let { bitmap ->
@@ -30,13 +47,18 @@ object SimpleGenerator {
                 return outputFile
             }
 
-            val params = GenerateParams(prompt = prompt)
-            val bitmap = sd.txt2img(params)
+            val bitmap =
+                edge.image.generate(
+                    ImageGenerationRequest(
+                        prompt = prompt,
+                        model = ModelSpec.huggingFace(repoId = modelId),
+                    ),
+                )
             val outputFile = File(outputDir, "image_${System.currentTimeMillis()}.png")
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputFile.outputStream())
             return outputFile
         } finally {
-            sd.close()
+            edge.close()
         }
     }
 }

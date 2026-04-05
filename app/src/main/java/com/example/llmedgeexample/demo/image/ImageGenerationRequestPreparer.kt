@@ -1,9 +1,12 @@
 package com.example.llmedgeexample.demo.image
 
-import android.content.Context
-import io.aatricks.llmedge.huggingface.HuggingFaceHub
+import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
+import io.aatricks.llmedge.model.ModelArtifactKind
+import io.aatricks.llmedge.model.ModelCapability
+import io.aatricks.llmedge.model.ModelHints
+import io.aatricks.llmedge.model.ModelSpec
 import java.io.File
 
 internal data class PreparedImageGenerationRequest(
@@ -14,7 +17,7 @@ internal data class PreparedImageGenerationRequest(
 
 internal fun interface ImageLoraAssetDownloader {
     suspend fun download(
-        context: Context,
+        edge: LLMEdge,
         onProgress: (downloaded: Long, total: Long?) -> Unit,
     ): File
 }
@@ -23,7 +26,7 @@ internal class ImageGenerationRequestPreparer(
     private val loraDownloader: ImageLoraAssetDownloader = DetailTweakerImageLoraDownloader,
 ) {
     suspend fun prepare(
-        context: Context,
+        edge: LLMEdge,
         baseRequest: ImageGenerationRequest,
         loraRequested: Boolean,
         onStatus: (String) -> Unit = {},
@@ -35,7 +38,7 @@ internal class ImageGenerationRequestPreparer(
         return try {
             onStatus("Downloading Detail Tweaker LoRA...")
             val loraFile =
-                loraDownloader.download(context) { downloaded, total ->
+                loraDownloader.download(edge) { downloaded, total ->
                     onStatus(formatDownloadStatus(downloaded, total))
                 }
             val loraDirectory = loraFile.parentFile?.absolutePath
@@ -90,14 +93,22 @@ internal class ImageGenerationRequestPreparer(
 
 private object DetailTweakerImageLoraDownloader : ImageLoraAssetDownloader {
     override suspend fun download(
-        context: Context,
+        edge: LLMEdge,
         onProgress: (downloaded: Long, total: Long?) -> Unit,
     ): File =
-        HuggingFaceHub.ensureRepoFileOnDisk(
-            context = context,
-            modelId = "imagepipeline/Detail-Tweaker-LoRA-SD1.5",
-            filename = "add_detail.safetensors",
-            allowedExtensions = listOf(".safetensors"),
-            onProgress = onProgress,
-        ).file
+        edge.models.resolve(
+            ModelSpec.huggingFace(
+                repoId = "imagepipeline/Detail-Tweaker-LoRA-SD1.5",
+                filename = "add_detail.safetensors",
+                preferredQuantizations = emptyList(),
+                hints =
+                    ModelHints(
+                        artifactKind = ModelArtifactKind.REPO_FILE,
+                        capabilities = setOf(ModelCapability.IMAGE),
+                    ),
+            ),
+            onProgress = { progress ->
+                onProgress(progress.downloadedBytes, progress.totalBytes)
+            },
+        )
 }
