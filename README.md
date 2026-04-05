@@ -363,9 +363,15 @@ Log.d("Memory", "Native heap: ${snapshot.nativePssKb / 1024}MB")
 ### Thread Configuration
 
 ```kotlin
-val params = SmolLM.InferenceParams(
-    numThreads = Runtime.getRuntime().availableProcessors(),
-    contextSize = 2048  // Adjust based on device RAM
+val edge = LLMEdge.create(
+    context = context,
+    scope = lifecycleScope,
+    config = LLMEdgeConfig(
+        text = TextRuntimeConfig(
+            promptThreads = Runtime.getRuntime().availableProcessors(),
+            contextSize = 2048,
+        ),
+    ),
 )
 ```
 
@@ -373,11 +379,11 @@ val params = SmolLM.InferenceParams(
 
 Verify Android GPU capability:
 ```kotlin
-when {
-    LLMEdge.isOpenClAvailable() -> Log.i("Performance", "OpenCL backend available")
-    LLMEdge.isVulkanAvailable() -> Log.i("Performance", "Vulkan backend available")
-    else -> Log.w("Performance", "CPU backend only")
-}
+val textBackends = LLMEdge.getTextBackendAvailability()
+val imageBackends = LLMEdge.getImageBackendAvailability()
+
+Log.i("Performance", "Text backends: $textBackends")
+Log.i("Performance", "Image backends: $imageBackends")
 ```
 
 Check logcat for initialization:

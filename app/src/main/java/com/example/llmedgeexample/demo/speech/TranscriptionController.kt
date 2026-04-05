@@ -1,8 +1,11 @@
 package com.example.llmedgeexample.demo.speech
 
-import android.content.Context
-import android.view.View
-import io.aatricks.llmedge.huggingface.HuggingFaceHub
+import io.aatricks.llmedge.LLMEdge
+import io.aatricks.llmedge.model.ModelArtifactKind
+import io.aatricks.llmedge.model.ModelCapability
+import io.aatricks.llmedge.model.ModelHints
+import io.aatricks.llmedge.model.ModelSpec
+import io.aatricks.llmedge.speech.WhisperLoadOptions
 import io.aatricks.llmedge.speech.stt.Whisper
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -47,7 +50,7 @@ internal class TranscriptionController(
     }
 
     fun downloadModel(
-        context: Context,
+        edge: LLMEdge,
         modelId: String,
         filename: String,
         onStarted: () -> Unit,
@@ -58,13 +61,14 @@ internal class TranscriptionController(
         scope.launch(ioDispatcher) {
             try {
                 val result =
-                    HuggingFaceHub.ensureModelOnDisk(
-                        context = context.applicationContext,
-                        modelId = modelId,
-                        filename = filename,
+                    edge.models.prefetch(
+                        whisperModelSpec(
+                            repoId = modelId,
+                            filename = filename,
+                        ),
                     )
                 withContext(mainDispatcher) {
-                    onCompleted(result.file.absolutePath)
+                    onCompleted(result.absolutePath)
                 }
             } catch (e: Exception) {
                 withContext(mainDispatcher) {
@@ -74,25 +78,22 @@ internal class TranscriptionController(
         }
     }
 
-    fun loadModel(
-        modelPath: String,
+    fun prepareModel(
+        edge: LLMEdge,
+        model: ModelSpec,
         onStarted: () -> Unit,
-        onCompleted: (Whisper, String, Boolean) -> Unit,
+        onCompleted: () -> Unit,
         onError: (String) -> Unit,
     ) {
         onStarted()
         scope.launch(ioDispatcher) {
             try {
-                val whisper =
-                    Whisper.load(
-                        modelPath = modelPath,
-                        useGpu = false,
-                        flashAttn = true,
-                    )
-                val modelType = whisper.getModelType()
-                val multilingual = whisper.isMultilingual()
+                edge.speech.prepareSpeechToText(
+                    model = model,
+                    loadOptions = WhisperLoadOptions(useGpu = false),
+                )
                 withContext(mainDispatcher) {
-                    onCompleted(whisper, modelType, multilingual)
+                    onCompleted()
                 }
             } catch (e: Exception) {
                 withContext(mainDispatcher) {
@@ -103,7 +104,8 @@ internal class TranscriptionController(
     }
 
     fun transcribe(
-        whisper: Whisper,
+        edge: LLMEdge,
+        model: ModelSpec,
         samples: FloatArray,
         callbacks: TranscriptionCallbacks,
     ) {
@@ -111,28 +113,33 @@ internal class TranscriptionController(
         transcriptionJob =
             scope.launch(ioDispatcher) {
                 try {
-                    whisper.setProgressCallback { progress ->
-                        scope.launch(mainDispatcher) { callbacks.onProgress(progress) }
-                    }
-                    whisper.setSegmentCallback { _, startTime, endTime, text ->
-                        val startMs = startTime * 10
-                        val endMs = endTime * 10
-                        scope.launch(mainDispatcher) {
-                            callbacks.onSegment("[$startMs-$endMs] $text\n")
-                        }
-                    }
+                    withContext(mainDispatcher) { callbacks.onProgress(5) }
                     val segments =
-                        whisper.transcribe(
-                            samples = samples,
+                        edge.speech.transcribe(
+                            audioSamples = samples,
+                            model = model,
                             params =
                                 Whisper.TranscribeParams(
                                     nThreads = Runtime.getRuntime().availableProcessors().coerceAtMost(4),
                                     tokenTimestamps = true,
                                     printProgress = false,
                                 ),
+                            loadOptions = WhisperLoadOptions(useGpu = false),
                         )
-                    val lang = whisper.detectLanguage(samples)
                     withContext(mainDispatcher) {
+                        segments.forEach { segment ->
+                            callbacks.onSegment("[${segment.startTimeMs}-${segment.endTimeMs}] ${segment.text}\n")
+                        }
+                        callbacks.onProgress(95)
+                    }
+                    val lang =
+                        edge.speech.detectLanguage(
+                            audioSamples = samples,
+                            model = model,
+                            loadOptions = WhisperLoadOptions(useGpu = false),
+                        )
+                    withContext(mainDispatcher) {
+                        callbacks.onProgress(100)
                         callbacks.onCompleted(segments, lang)
                     }
                 } catch (_: CancellationException) {
@@ -154,4 +161,19 @@ internal class TranscriptionController(
     fun cancel() {
         transcriptionJob?.cancel()
     }
+
+    private fun whisperModelSpec(
+        repoId: String,
+        filename: String,
+    ): ModelSpec =
+        ModelSpec.huggingFace(
+            repoId = repoId,
+            filename = filename,
+            preferredQuantizations = emptyList(),
+            hints =
+                ModelHints(
+                    artifactKind = ModelArtifactKind.REPO_FILE,
+                    capabilities = setOf(ModelCapability.SPEECH_TO_TEXT),
+                ),
+        )
 }

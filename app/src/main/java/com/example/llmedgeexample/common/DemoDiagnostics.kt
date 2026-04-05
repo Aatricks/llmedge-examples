@@ -46,14 +46,15 @@ fun Context.logDemoMemoryState(
     logger: (String) -> Unit = { message -> Log.i(tag, message) },
 ) {
     val snapshot = demoMemorySnapshot()
+    val gpuStatus = if (includeGpu) detectGpuBackendStatus() else null
     logger("=== Memory: $phase ===")
     logger("  Heap: ${snapshot.heapUsedMb}MB / ${snapshot.heapMaxMb}MB max")
     logger("  System: ${snapshot.systemAvailableMb}MB / ${snapshot.systemTotalMb}MB total")
-    if (includeGpu) {
-        if (isOpenClAvailableCompat()) {
+    gpuStatus?.let { status ->
+        if (status.openClAvailable) {
             logger("  OpenCL: available")
         }
-        LLMEdge.getVulkanDeviceInfo()?.let { vulkan ->
+        status.vulkanInfo?.let { vulkan ->
             logger("  Vulkan: ${vulkan.freeMemoryMB}MB / ${vulkan.totalMemoryMB}MB")
         }
     }

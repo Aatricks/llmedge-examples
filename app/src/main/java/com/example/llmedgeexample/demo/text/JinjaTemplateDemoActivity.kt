@@ -7,8 +7,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
+import io.aatricks.llmedge.LLMEdge
+import io.aatricks.llmedge.LLMEdgeConfig
+import io.aatricks.llmedge.TextRuntimeConfig
+import io.aatricks.llmedge.lifecycle.LLMEdgeLifecycle
+import io.aatricks.llmedge.model.ModelSpec
+import io.aatricks.llmedge.text.TextModelOptions
 import io.aatricks.llmedge.runtime.CpuTopology
-import io.aatricks.llmedge.text.runtime.SmolLM
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -39,8 +44,26 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
         private const val FLASH_ATTN_ENABLED = false
     }
 
-    private var smol: SmolLM? = null
     private var demoJob: Job? = null
+    private val edge by lazy(LazyThreadSafetyMode.NONE) {
+        LLMEdgeLifecycle.bind(
+            this,
+            LLMEdge.create(
+                context = this,
+                scope = lifecycleScope,
+                config =
+                    LLMEdgeConfig(
+                        text =
+                            TextRuntimeConfig(
+                                useVulkan = false,
+                                promptThreads = PROMPT_THREADS,
+                                generationThreads = GENERATION_THREADS,
+                                useFlashAttention = FLASH_ATTN_ENABLED,
+                            ),
+                    ),
+            ),
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,7 +76,7 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
 
         output.text =
             buildString {
-                appendLine("This demo loads SmolLM with an explicit loop-based Jinja chat template override.")
+                appendLine("This demo uses edge.text with an explicit loop-based Jinja chat template override.")
                 appendLine("It intentionally uses the same CPU-oriented baseline as the Hugging Face demo so the template path is the main variable.")
                 appendLine()
                 appendLine("Model source:")
@@ -96,24 +119,18 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
                         }
 
                     try {
-                        smol?.close()
-                        smol = SmolLM(useVulkan = false)
+                        val modelSpec =
+                            ModelSpec.huggingFace(
+                                repoId = MODEL_ID,
+                                revision = MODEL_REVISION,
+                                filename = MODEL_FILENAME,
+                            )
 
-                        val downloadResult =
+                        val modelFile =
                             withContext(Dispatchers.IO) {
-                                smol!!.loadFromHuggingFace(
-                                    context = this@JinjaTemplateDemoActivity,
-                                    modelId = MODEL_ID,
-                                    revision = MODEL_REVISION,
-                                    filename = MODEL_FILENAME,
-                                    params =
-                                        SmolLM.InferenceParams(
-                                            chatTemplate = JINJA_CHAT_TEMPLATE,
-                                            useFlashAttn = FLASH_ATTN_ENABLED,
-                                            numThreads = PROMPT_THREADS,
-                                            generationThreads = GENERATION_THREADS,
-                                        ),
-                                    onProgress = { downloaded, total ->
+                                edge.models.prefetch(
+                                    spec = modelSpec,
+                                    onProgress = { progress ->
                                         runOnUiThread {
                                             output.text =
                                                 buildString {
@@ -128,7 +145,10 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
                                                     appendLine()
                                                     appendLine("Download:")
                                                     appendLine(
-                                                        formatDownloadProgress(downloaded, total)
+                                                        formatDownloadProgress(
+                                                            progress.downloadedBytes,
+                                                            progress.totalBytes,
+                                                        )
                                                     )
                                                     appendLine()
                                                     appendLine("Model:")
@@ -142,22 +162,32 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
                                 )
                             }
 
-                        withContext(Dispatchers.IO) {
-                            smol!!.addSystemPrompt(
-                                "You are a concise assistant. Answer plainly and mention chat templates only if asked.",
-                            )
-                        }
-
                         val response =
                             withContext(Dispatchers.IO) {
-                                smol!!.getResponse(PROMPT, maxTokens = 96)
+                                edge.text.generate(
+                                    prompt = PROMPT,
+                                    model = modelSpec,
+                                    systemPrompt = "You are a concise assistant. Answer plainly and mention chat templates only if asked.",
+                                    options =
+                                        TextModelOptions(
+                                            chatTemplate = JINJA_CHAT_TEMPLATE,
+                                            useVulkan = false,
+                                            useFlashAttention = FLASH_ATTN_ENABLED,
+                                            numThreads = PROMPT_THREADS,
+                                            generationThreads = GENERATION_THREADS,
+                                        ),
+                                    maxTokens = 96,
+                                )
                             }
-                        val metrics = smol!!.getLastGenerationMetrics()
+                        val metrics =
+                            requireNotNull(edge.text.getLastGenerationMetrics()) {
+                                "No generation metrics recorded for the Jinja demo request."
+                            }
 
                         output.text =
                             buildString {
                                 appendLine("Jinja template override loaded successfully.")
-                                appendLine("Model: ${downloadResult.file.absolutePath}")
+                                appendLine("Model: ${modelFile.absolutePath}")
                                 appendLine("Downloaded from: $MODEL_ID")
                                 appendLine("Backend: $BACKEND_LABEL")
                                 appendLine("Prompt threads: $PROMPT_THREADS")
@@ -178,7 +208,6 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
                                         "throughput=${"%.2f".format(Locale.US, metrics.tokensPerSecond)} tok/s, " +
                                         "duration=${"%.2f".format(Locale.US, metrics.elapsedSeconds)} s",
                                 )
-                                appendLine("Context used: ${smol!!.getContextLengthUsed()} tokens")
                             }
                     } catch (error: Throwable) {
                         output.append("\nDemo failed: ${error.message}")
@@ -196,8 +225,6 @@ class JinjaTemplateDemoActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         demoJob?.cancel()
-        smol?.close()
-        smol = null
         super.onDestroy()
     }
 }

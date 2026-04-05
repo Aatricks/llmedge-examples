@@ -2,6 +2,7 @@ package com.example.llmedgeexample.common
 
 import android.content.Context
 import androidx.lifecycle.LifecycleOwner
+import io.aatricks.llmedge.ComputeBackendAvailability
 import io.aatricks.llmedge.ImageRuntimeConfig
 import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.LLMEdgeConfig
@@ -47,26 +48,29 @@ fun setCpuOnlyForced(context: Context, enabled: Boolean) {
         .apply()
 }
 
-fun isOpenClAvailableCompat(): Boolean =
-    runCatching {
-        val method = LLMEdge::class.java.getMethod("isOpenClAvailable")
-        (method.invoke(null) as? Boolean) == true
-    }.getOrDefault(false)
-
 data class GpuBackendStatus(
-    val openClAvailable: Boolean,
-    val vulkanAvailable: Boolean,
-    val vulkanInfo: VulkanDeviceInfo?,
-)
+    val text: ComputeBackendAvailability,
+    val speech: ComputeBackendAvailability,
+    val image: ComputeBackendAvailability,
+    val vision: ComputeBackendAvailability,
+) {
+    val openClAvailable: Boolean
+        get() = text.openClAvailable || speech.openClAvailable || image.openClAvailable || vision.openClAvailable
 
-fun detectGpuBackendStatus(): GpuBackendStatus {
-    val vulkanInfo = LLMEdge.getVulkanDeviceInfo()
-    return GpuBackendStatus(
-        openClAvailable = isOpenClAvailableCompat(),
-        vulkanAvailable = vulkanInfo != null || LLMEdge.isVulkanAvailable(),
-        vulkanInfo = vulkanInfo,
-    )
+    val vulkanAvailable: Boolean
+        get() = text.vulkanAvailable || speech.vulkanAvailable || image.vulkanAvailable || vision.vulkanAvailable
+
+    val vulkanInfo: VulkanDeviceInfo?
+        get() = image.vulkanDeviceInfo
 }
+
+fun detectGpuBackendStatus(): GpuBackendStatus =
+    GpuBackendStatus(
+        text = LLMEdge.getTextBackendAvailability(),
+        speech = LLMEdge.getSpeechBackendAvailability(),
+        image = LLMEdge.getImageBackendAvailability(),
+        vision = LLMEdge.getVisionBackendAvailability(),
+    )
 
 fun GpuBackendStatus.summary(): String {
     val names = ArrayList<String>(2)
@@ -76,5 +80,5 @@ fun GpuBackendStatus.summary(): String {
     if (vulkanAvailable) {
         names += "Vulkan"
     }
-    return if (names.isEmpty()) "CPU only" else names.joinToString(", ")
+    return if (names.isEmpty()) "CPU only" else "${names.joinToString(", ")} (varies by feature)"
 }

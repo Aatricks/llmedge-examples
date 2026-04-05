@@ -14,7 +14,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
-import io.aatricks.llmedge.speech.stt.Whisper
+import io.aatricks.llmedge.model.ModelArtifactKind
+import io.aatricks.llmedge.model.ModelCapability
+import io.aatricks.llmedge.model.ModelHints
+import io.aatricks.llmedge.model.ModelSpec
+import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,17 +46,19 @@ class TranscriptionActivity : AppCompatActivity() {
         private const val TAG = "TranscriptionActivity"
         private const val DEFAULT_MODEL_FILE = "ggml-base.bin"
         private const val HUGGING_FACE_MODEL_ID = "ggerganov/whisper.cpp"
+        private const val SAMPLE_RATE = 16_000
     }
 
     private val views by lazy(LazyThreadSafetyMode.NONE) { TranscriptionViews.bind(this) }
     private val controller by lazy(LazyThreadSafetyMode.NONE) { TranscriptionController(lifecycleScope) }
+    private val edge by lazy(LazyThreadSafetyMode.NONE) { bindEdge(this, this, lifecycleScope) }
 
-    private var whisper: Whisper? = null
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
     private var transcriptionJob: Job? = null
     private var recordedSamples = mutableListOf<Float>()
     private var isRecording = false
+    private var currentModelPath: String? = null
 
     private val requestPermissionLauncher =
             registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -107,6 +113,7 @@ class TranscriptionActivity : AppCompatActivity() {
             if (result.exists) {
                 views.statusLabel.text = "Model ready: ${result.modelFile.name}"
                 views.downloadButton.visibility = View.GONE
+                currentModelPath = result.modelFile.absolutePath
                 loadModel(result.modelFile.absolutePath)
             } else {
                 views.statusLabel.text = "Model not found. Please download."
@@ -118,7 +125,7 @@ class TranscriptionActivity : AppCompatActivity() {
 
     private fun downloadModel() {
         controller.downloadModel(
-            context = applicationContext,
+            edge = edge,
             modelId = HUGGING_FACE_MODEL_ID,
             filename = DEFAULT_MODEL_FILE,
             onStarted = {
@@ -128,6 +135,7 @@ class TranscriptionActivity : AppCompatActivity() {
                 views.statusLabel.text = "Downloading model..."
             },
             onCompleted = { modelPath ->
+                currentModelPath = modelPath
                 views.statusLabel.text = "Model downloaded!"
                 views.progressBar.visibility = View.GONE
                 views.downloadButton.visibility = View.GONE
@@ -143,16 +151,16 @@ class TranscriptionActivity : AppCompatActivity() {
     }
 
     private fun loadModel(modelPath: String) {
-        controller.loadModel(
-            modelPath = modelPath,
+        controller.prepareModel(
+            edge = edge,
+            model = speechModelSpec(modelPath),
             onStarted = {
                 views.progressBar.visibility = View.VISIBLE
                 views.progressBar.isIndeterminate = true
                 views.statusLabel.text = "Loading model..."
             },
-            onCompleted = { loadedWhisper, modelType, multilingual ->
-                whisper = loadedWhisper
-                views.statusLabel.text = "Model loaded: $modelType (multilingual: $multilingual)"
+            onCompleted = {
+                views.statusLabel.text = "Speech client ready: ${File(modelPath).name}"
                 views.progressBar.visibility = View.GONE
                 views.recordButton.isEnabled = true
             },
@@ -167,7 +175,7 @@ class TranscriptionActivity : AppCompatActivity() {
     private fun startRecording() {
         if (isRecording) return
 
-        val sampleRate = Whisper.SAMPLE_RATE
+        val sampleRate = SAMPLE_RATE
         val channelConfig = AudioFormat.CHANNEL_IN_MONO
         val audioFormat = AudioFormat.ENCODING_PCM_FLOAT
         val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat) * 2
@@ -217,7 +225,7 @@ class TranscriptionActivity : AppCompatActivity() {
                                 }
 
                                 val durationSeconds =
-                                        recordedSamples.size / Whisper.SAMPLE_RATE.toFloat()
+                                        recordedSamples.size / SAMPLE_RATE.toFloat()
                                 withContext(Dispatchers.Main) {
                                     views.statusLabel.text =
                                             "Recording: ${String.format("%.1f", durationSeconds)}s"
@@ -241,7 +249,7 @@ class TranscriptionActivity : AppCompatActivity() {
         views.recordButton.isEnabled = true
         views.stopButton.isEnabled = false
 
-        val durationSeconds = recordedSamples.size / Whisper.SAMPLE_RATE.toFloat()
+        val durationSeconds = recordedSamples.size / SAMPLE_RATE.toFloat()
         views.statusLabel.text = "Recorded ${String.format("%.1f", durationSeconds)}s of audio"
 
         if (recordedSamples.isNotEmpty()) {
@@ -257,7 +265,7 @@ class TranscriptionActivity : AppCompatActivity() {
             return
         }
 
-        val whisperInstance = whisper ?: run {
+        val modelPath = currentModelPath ?: run {
             Toast.makeText(this, "Model not loaded", Toast.LENGTH_SHORT).show()
             return
         }
@@ -271,7 +279,8 @@ class TranscriptionActivity : AppCompatActivity() {
         views.statusLabel.text = "Transcribing..."
 
         controller.transcribe(
-            whisper = whisperInstance,
+            edge = edge,
+            model = speechModelSpec(modelPath),
             samples = samples,
             callbacks =
                 TranscriptionCallbacks(
@@ -310,7 +319,15 @@ class TranscriptionActivity : AppCompatActivity() {
         stopRecording()
         transcriptionJob?.cancel()
         controller.cancel()
-        whisper?.close()
-        whisper = null
     }
+
+    private fun speechModelSpec(modelPath: String): ModelSpec =
+        ModelSpec.localFile(
+            modelPath,
+            hints =
+                ModelHints(
+                    artifactKind = ModelArtifactKind.REPO_FILE,
+                    capabilities = setOf(ModelCapability.SPEECH_TO_TEXT),
+                ),
+        )
 }
