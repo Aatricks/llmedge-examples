@@ -24,6 +24,13 @@
             android:text="Downloads a GGUF instruct model, creates a ToolAgent with built-in device tools, runs read-only tools normally, and only allows action tools when the switch is enabled. Zero-argument tools like time and battery should be called with empty arguments."
             android:textColor="@android:color/darker_gray" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Custom JVM-hosted tool example: see samples/CustomToolSamples.kt for BashToolFactory wiring. Android devices usually do not ship bash, so treat that sample as a host-side integration example."
+            android:textColor="@android:color/darker_gray" />
+
         <EditText
             android:id="@+id/inputToolModelId"
             android:layout_width="match_parent"

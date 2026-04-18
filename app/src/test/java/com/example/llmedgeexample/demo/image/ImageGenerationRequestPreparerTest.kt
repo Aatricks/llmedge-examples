@@ -1,6 +1,7 @@
 package com.example.llmedgeexample.demo.image
 
 import androidx.test.core.app.ApplicationProvider
+import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
 import java.io.File
@@ -20,13 +21,18 @@ class ImageGenerationRequestPreparerTest {
     @Test
     fun `toggle off returns original request`() = runTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val edge = LLMEdge.create(context, this)
         val baseRequest = ImageGenerationRequest(prompt = "city skyline", width = 128, height = 128)
         val preparer =
             ImageGenerationRequestPreparer(
                 loraDownloader = ImageLoraAssetDownloader { _, _ -> error("downloader should not be called") },
             )
 
-        val prepared = preparer.prepare(context, baseRequest, loraRequested = false)
+        val prepared = try {
+            preparer.prepare(edge, baseRequest, loraRequested = false)
+        } finally {
+            edge.close()
+        }
 
         assertFalse(prepared.loraApplied)
         assertEquals(baseRequest, prepared.request)
@@ -36,6 +42,7 @@ class ImageGenerationRequestPreparerTest {
     @Test
     fun `successful download appends lora tag and directory`() = runTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val edge = LLMEdge.create(context, this)
         val loraDirectory = File(context.filesDir, "loras").apply { mkdirs() }
         val loraFile = File(loraDirectory, "detail-tweaker.safetensors").apply { writeText("stub") }
         val statusMessages = mutableListOf<String>()
@@ -49,12 +56,16 @@ class ImageGenerationRequestPreparerTest {
             )
 
         val prepared =
-            preparer.prepare(
-                context = context,
-                baseRequest = ImageGenerationRequest(prompt = "city skyline", width = 128, height = 128),
-                loraRequested = true,
-                onStatus = statusMessages::add,
-            )
+            try {
+                preparer.prepare(
+                    edge = edge,
+                    baseRequest = ImageGenerationRequest(prompt = "city skyline", width = 128, height = 128),
+                    loraRequested = true,
+                    onStatus = statusMessages::add,
+                )
+            } finally {
+                edge.close()
+            }
 
         assertTrue(prepared.loraApplied)
         assertEquals("city skyline <lora:detail-tweaker:1.0>", prepared.request.prompt)
@@ -67,13 +78,18 @@ class ImageGenerationRequestPreparerTest {
     @Test
     fun `download failure reports warning and continues without lora`() = runTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val edge = LLMEdge.create(context, this)
         val baseRequest = ImageGenerationRequest(prompt = "city skyline", width = 128, height = 128)
         val preparer =
             ImageGenerationRequestPreparer(
                 loraDownloader = ImageLoraAssetDownloader { _, _ -> throw IllegalStateException("network down") },
             )
 
-        val prepared = preparer.prepare(context, baseRequest, loraRequested = true)
+        val prepared = try {
+            preparer.prepare(edge, baseRequest, loraRequested = true)
+        } finally {
+            edge.close()
+        }
 
         assertFalse(prepared.loraApplied)
         assertEquals(baseRequest, prepared.request)
