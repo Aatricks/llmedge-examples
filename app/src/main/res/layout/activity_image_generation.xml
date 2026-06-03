@@ -113,6 +113,13 @@
             android:layout_marginTop="12dp"
             android:text="Use Detail Tweaker LoRA" />
 
+        <Switch
+            android:id="@+id/flux2Toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="FLUX.2 Klein 4B (downloads ~5GB; high-RAM device)" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

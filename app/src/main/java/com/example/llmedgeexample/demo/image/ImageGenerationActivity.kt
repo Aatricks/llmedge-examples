@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
+import io.aatricks.llmedge.image.Flux2Klein
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.GenerationMetrics
 import kotlinx.coroutines.CancellationException
@@ -107,22 +108,34 @@ class ImageGenerationActivity : AppCompatActivity() {
         views.progressBar.isIndeterminate = true
         views.generateButton.isEnabled = false
         val prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
-        val loraRequested = views.loraToggle.isChecked
+        val flux2Requested = views.flux2Toggle.isChecked
+        // FLUX.2 Klein is a split-model DiT pipeline; LoRA / Detail-Tweaker doesn't apply to it.
+        val loraRequested = views.loraToggle.isChecked && !flux2Requested
 
         val useFlashAttn = width >= 512 && height >= 512
         val baseRequest =
-            ImageGenerationRequest(
-                prompt = prompt,
-                width = width,
-                height = height,
-                steps = steps,
-                cfgScale = cfg,
-                seed = seed,
-                flashAttention = useFlashAttn,
-                forceSequentialLoad = false,
-                loraModelDir = null,
-                loraApplyMode = LoraApplyMode.AUTO,
-            )
+            if (flux2Requested) {
+                Flux2Klein.imageRequest(
+                    prompt = prompt,
+                    width = width,
+                    height = height,
+                    seed = seed,
+                    flashAttention = useFlashAttn,
+                )
+            } else {
+                ImageGenerationRequest(
+                    prompt = prompt,
+                    width = width,
+                    height = height,
+                    steps = steps,
+                    cfgScale = cfg,
+                    seed = seed,
+                    flashAttention = useFlashAttn,
+                    forceSequentialLoad = false,
+                    loraModelDir = null,
+                    loraApplyMode = LoraApplyMode.AUTO,
+                )
+            }
 
         requestPreparationJob =
             lifecycleScope.launch {
