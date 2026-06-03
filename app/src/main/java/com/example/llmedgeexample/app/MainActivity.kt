@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
+import com.example.llmedgeexample.demo.conversion.SafetensorsConversionActivity
 import com.example.llmedgeexample.demo.image.ImageGenerationActivity
 import com.example.llmedgeexample.demo.rag.RagActivity
 import com.example.llmedgeexample.demo.speech.TTSActivity
@@ -86,6 +87,7 @@ class MainActivity : AppCompatActivity() {
             DemoDestination(R.id.btnOpenVideoGeneration, VideoGenerationActivity::class),
             DemoDestination(R.id.btnOpenImageGeneration, ImageGenerationActivity::class),
             DemoDestination(R.id.btnOpenToolCalling, ToolCallingDemoActivity::class),
+            DemoDestination(R.id.btnOpenConversion, SafetensorsConversionActivity::class),
             DemoDestination(R.id.btnOpenTranscription, TranscriptionActivity::class),
             DemoDestination(R.id.btnOpenTTS, TTSActivity::class),
         )

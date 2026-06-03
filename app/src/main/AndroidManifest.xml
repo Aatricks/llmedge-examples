@@ -53,6 +53,9 @@
             android:name=".demo.tools.ToolCallingDemoActivity"
             android:exported="false" />
         <activity
+            android:name=".demo.conversion.SafetensorsConversionActivity"
+            android:exported="false" />
+        <activity
             android:name=".demo.video.HeadlessVideoTestActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
