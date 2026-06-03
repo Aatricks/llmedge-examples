@@ -58,15 +58,20 @@ class SafetensorsConversionActivity : AppCompatActivity() {
             setPadding(pad, pad, pad, pad)
         }
 
+        // URI variation + no-suggestions: a repo id / filesystem path must not be autocorrected
+        // (keyboards otherwise insert spaces after '.' and mangle the value).
+        val noAutocorrect = InputType.TYPE_CLASS_TEXT or
+            InputType.TYPE_TEXT_VARIATION_URI or
+            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         val repoInput = EditText(this).apply {
             hint = "HF repo id, or an absolute /path to a local model dir"
             setText(DEFAULT_REPO)
-            inputType = InputType.TYPE_CLASS_TEXT
+            inputType = noAutocorrect
         }
         val preInput = EditText(this).apply {
             hint = "tokenizer.ggml.pre id (e.g. smollm)"
             setText(DEFAULT_PRE)
-            inputType = InputType.TYPE_CLASS_TEXT
+            inputType = noAutocorrect
         }
         val quantize = CheckBox(this).apply {
             text = "Quantize to Q4_K_M (smaller; uncheck for F16)"
@@ -130,7 +135,10 @@ class SafetensorsConversionActivity : AppCompatActivity() {
                         prompt = "The capital of France is",
                         model = ModelSpec.localFile(gguf),
                         systemPrompt = "You are a concise assistant running on-device.",
-                        options = TextModelOptions(useVulkan = false, useFlashAttention = false),
+                        // Greedy + a hard token cap: tiny models can otherwise ramble until the context
+                        // fills (the model never emits EOS), which surfaces as "context size reached".
+                        options = TextModelOptions(useVulkan = false, useFlashAttention = false, temperature = 0.0f),
+                        maxTokens = 48,
                     )
                 }
                 val metrics = edge.text.getLastGenerationMetrics()
