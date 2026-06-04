@@ -118,7 +118,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="FLUX.2 Klein 4B (downloads ~5GB; high-RAM device)" />
+            android:text="FLUX.2 Klein 4B — Bonsai ternary Q2_K (~3.5GB DL, sequential load, ~6GB+ RAM)" />
 
         <LinearLayout
             android:layout_width="match_parent"

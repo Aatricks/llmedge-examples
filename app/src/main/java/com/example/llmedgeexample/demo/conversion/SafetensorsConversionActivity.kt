@@ -134,10 +134,18 @@ class SafetensorsConversionActivity : AppCompatActivity() {
                     edge.text.generate(
                         prompt = "The capital of France is",
                         model = ModelSpec.localFile(gguf),
-                        systemPrompt = "You are a concise assistant running on-device.",
+                        // SmolLM-135M (this repo) is a *base* model, not an instruct model. Wrapping the
+                        // prompt in a chat template (system + <|im_start|> turns) makes a base model emit
+                        // template/EOS tokens that trim away to an empty visible response. Use a raw
+                        // pass-through template and no system prompt so it does a plain text completion.
+                        options = TextModelOptions(
+                            useVulkan = false,
+                            useFlashAttention = false,
+                            temperature = 0.0f,
+                            chatTemplate = "{%- for message in messages -%}{{ message['content'] }}{%- endfor -%}",
+                        ),
                         // Greedy + a hard token cap: tiny models can otherwise ramble until the context
                         // fills (the model never emits EOS), which surfaces as "context size reached".
-                        options = TextModelOptions(useVulkan = false, useFlashAttention = false, temperature = 0.0f),
                         maxTokens = 48,
                     )
                 }

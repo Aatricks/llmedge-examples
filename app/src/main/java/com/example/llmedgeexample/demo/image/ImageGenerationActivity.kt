@@ -115,7 +115,9 @@ class ImageGenerationActivity : AppCompatActivity() {
         val useFlashAttn = width >= 512 && height >= 512
         val baseRequest =
             if (flux2Requested) {
-                Flux2Klein.imageRequest(
+                // Bonsai ternary Q2_K DiT (~1.3 GB) with sequential loading — peak RAM ≈ 2.6 GB,
+                // the low-memory FLUX.2 Klein path suited to ≤8 GB devices.
+                Flux2Klein.bonsaiImageRequest(
                     prompt = prompt,
                     width = width,
                     height = height,
