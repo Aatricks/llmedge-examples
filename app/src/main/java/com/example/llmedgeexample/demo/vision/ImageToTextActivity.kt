@@ -51,7 +51,10 @@ class ImageToTextActivity : AppCompatActivity() {
                     tvResult.text = "Internal error: missing photo file"
                     return@registerForActivityResult
                 }
-                val bitmap = ImageUtils.fileToBitmap(file)
+                // Bound the decode: S22 camera captures are ~50 MP, which crashes the
+                // preview ImageView (200 MB bitmap > 100 MB canvas limit). OCR
+                // preprocessing caps at 1600 px anyway.
+                val bitmap = ImageUtils.fileToBitmap(file, maxDimension = 1600)
                 ivPreview.setImageBitmap(bitmap)
                 runOcr(bitmap)
             } catch (e: Exception) {
