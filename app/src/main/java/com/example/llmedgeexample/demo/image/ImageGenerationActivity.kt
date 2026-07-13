@@ -2,6 +2,7 @@ package com.example.llmedgeexample.demo.image
 
 import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -78,8 +79,11 @@ class ImageGenerationActivity : AppCompatActivity() {
             if (isChecked) views.flux2Toggle.isChecked = false
         }
 
+        views.shareLogsButton.setOnClickListener { shareLogs() }
+        GenerationLogs.currentLogPathLabel()?.let { views.logPathLabel.text = it }
+
         // Log initial memory state
-        logDemoMemoryState(TAG, "Activity created", includeGpu = true)
+        logDemoMemoryState(TAG, "Activity created", includeGpu = true) { FileLogger.i(TAG, it) }
     }
 
     private fun startGeneration() {
@@ -153,8 +157,14 @@ class ImageGenerationActivity : AppCompatActivity() {
                         Toast.makeText(this@ImageGenerationActivity, it, Toast.LENGTH_LONG).show()
                     }
 
-                    logDemoMemoryState(TAG, "Before image generation", includeGpu = true)
+                    logDemoMemoryState(TAG, "Before image generation", includeGpu = true) { FileLogger.i(TAG, it) }
 
+                    val submitLog =
+                        "Submitting image request: width=${prepared.request.width}, height=${prepared.request.height}, steps=${prepared.request.steps}, " +
+                            "flash=${prepared.request.flashAttention}, easyCache=${prepared.request.easyCache.enabled}, " +
+                            "sequential=${prepared.request.forceSequentialLoad}, loraRequested=$loraRequested, " +
+                            "loraApplied=${prepared.loraApplied}, loraDir=${prepared.request.loraModelDir ?: "none"}"
+                    FileLogger.i(TAG, submitLog)
                     android.util.Log.i(
                         TAG,
                         "Submitting image request: width=${prepared.request.width}, height=${prepared.request.height}, steps=${prepared.request.steps}, " +
@@ -173,7 +183,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                             ImageGenerationCallbacks(
                                 onProgress = ::updateProgressUI,
                                 onCompleted = { result ->
-                                    logDemoMemoryState(TAG, "After image generation", includeGpu = true)
+                                    logDemoMemoryState(TAG, "After image generation", includeGpu = true) { FileLogger.i(TAG, it) }
                                     views.previewImage.setImageBitmap(result.bitmap)
                                     result.metrics?.imageRequestMetrics?.let { imageMetrics ->
                                         android.util.Log.i(
@@ -211,6 +221,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                         views.progressBar.visibility = View.GONE
                     }
                 } catch (t: Throwable) {
+                    FileLogger.e(TAG, "Failed to prepare image request", t)
                     android.util.Log.e(TAG, "Failed to prepare image request", t)
                     if (!isDestroyed) {
                         views.progressBar.visibility = View.GONE
@@ -233,6 +244,22 @@ class ImageGenerationActivity : AppCompatActivity() {
             return
         }
         controller.cancel(ImageGenerationCancellationReason.USER_CANCEL)
+    }
+
+    private fun shareLogs() {
+        val intent = GenerationLogs.buildShareLogsIntent(this)
+        if (intent == null) {
+            Toast.makeText(this, "No log file found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            startActivity(Intent.createChooser(intent, "Share Logs"))
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "Failed to share logs", e)
+            val logFile = FileLogger.getCurrentLogFile()
+            Toast.makeText(this, "Log file: ${logFile ?: "unavailable"}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun updateProgressUI(percent: Int, status: String) {

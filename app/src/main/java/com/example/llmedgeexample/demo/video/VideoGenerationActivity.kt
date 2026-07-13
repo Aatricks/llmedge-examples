@@ -109,7 +109,7 @@ class VideoGenerationActivity : AppCompatActivity() {
         views.clearTaehvButton.setOnClickListener { clearTaehvFile() }
         views.shareLogsButton.setOnClickListener { shareLogs() }
 
-        VideoGenerationMediaSupport.currentLogPathLabel()?.let { path ->
+        GenerationLogs.currentLogPathLabel()?.let { path ->
             views.logPathLabel.text = path
         }
 
@@ -134,7 +134,7 @@ class VideoGenerationActivity : AppCompatActivity() {
     }
 
     private fun shareLogs() {
-        val intent = VideoGenerationMediaSupport.buildShareLogsIntent(this)
+        val intent = GenerationLogs.buildShareLogsIntent(this)
         if (intent == null) {
             Toast.makeText(this, "No log file found", Toast.LENGTH_SHORT).show()
             return

@@ -1,14 +1,11 @@
 package com.example.llmedgeexample.demo.video
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Environment
-import androidx.core.content.FileProvider
-import com.example.llmedgeexample.common.FileLogger
 import com.example.llmedgeexample.common.copyOpenableToCache
 import io.aatricks.llmedge.vision.ImageUtils
 import java.io.File
@@ -25,9 +22,6 @@ internal data class CachedVideoAsset(
 )
 
 internal object VideoGenerationMediaSupport {
-    fun currentLogPathLabel(): String? =
-        FileLogger.getCurrentLogFile()?.substringAfterLast("/Android/")
-
     fun createImagePickerIntent(): Intent =
         Intent.createChooser(
             Intent(Intent.ACTION_GET_CONTENT).apply {
@@ -85,26 +79,6 @@ internal object VideoGenerationMediaSupport {
             file = file,
             selectionPath = file.absolutePath,
         )
-    }
-
-    fun buildShareLogsIntent(activity: Activity): Intent? {
-        FileLogger.flush()
-        val logFile = FileLogger.getCurrentLogFile()?.let(::File)
-        if (logFile == null || !logFile.exists()) {
-            return null
-        }
-        val uri =
-            FileProvider.getUriForFile(
-                activity,
-                "${activity.packageName}.fileprovider",
-                logFile,
-            )
-        return Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "LLMEdge Logs")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
     }
 
     suspend fun saveFramesAsGif(
