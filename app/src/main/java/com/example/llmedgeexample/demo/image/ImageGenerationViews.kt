@@ -25,6 +25,8 @@ internal data class ImageGenerationViews(
     val loraToggle: Switch,
     val flux2Toggle: Switch,
     val miniT2iToggle: Switch,
+    val shareLogsButton: Button,
+    val logPathLabel: TextView,
 ) {
     companion object {
         fun bind(activity: Activity): ImageGenerationViews =
@@ -44,6 +46,8 @@ internal data class ImageGenerationViews(
                 loraToggle = activity.findViewById(R.id.loraToggle),
                 flux2Toggle = activity.findViewById(R.id.flux2Toggle),
                 miniT2iToggle = activity.findViewById(R.id.miniT2iToggle),
+                shareLogsButton = activity.findViewById(R.id.btnShareLogs),
+                logPathLabel = activity.findViewById(R.id.logPathLabel),
             )
     }
 }

@@ -1,6 +1,7 @@
 package com.example.llmedgeexample.demo.image
 
 import android.graphics.Bitmap
+import com.example.llmedgeexample.common.FileLogger
 import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.GenerationMetrics
@@ -201,8 +202,10 @@ internal class ImageGenerationController(
     }
 
     private fun logInfo(message: String) {
+        // FileLogger.i writes to the shared log file AND logcat; guard so a mocked/absent
+        // android.util.Log (unit tests) still falls back to stdout.
         try {
-            android.util.Log.i(tag, message)
+            FileLogger.i(tag, message)
         } catch (_: Throwable) {
             println("I/$tag: $message")
         }
@@ -213,7 +216,7 @@ internal class ImageGenerationController(
         throwable: Throwable,
     ) {
         try {
-            android.util.Log.e(tag, message, throwable)
+            FileLogger.e(tag, message, throwable)
         } catch (_: Throwable) {
             System.err.println("E/$tag: $message")
             System.err.println(throwable.stackTraceToString())
