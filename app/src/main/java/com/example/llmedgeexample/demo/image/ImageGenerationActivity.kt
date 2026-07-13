@@ -17,8 +17,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Activity for image generation using MeinaMix SD 1.5 model.
- * 
+ * Activity for image generation supporting SD 1.5 (MeinaMix), FLUX.2 Klein Bonsai,
+ * SD3 Medium, and MiniT2I.
+ *
  * Optimized for memory efficiency with:
  * - Proper model loading/unloading via LLMEdge
  * - Memory state logging for debugging
@@ -72,11 +73,16 @@ class ImageGenerationActivity : AppCompatActivity() {
                 Toast.makeText(this, "Detail Tweaker LoRA Disabled", Toast.LENGTH_SHORT).show()
             }
         }
-        views.flux2Toggle.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) views.miniT2iToggle.isChecked = false
-        }
-        views.miniT2iToggle.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) views.flux2Toggle.isChecked = false
+        views.modelPresetGroup.setOnCheckedChangeListener { _, _ ->
+            val preset = selectedPreset()
+            views.widthInput.setText(preset.defaultWidth.toString())
+            views.heightInput.setText(preset.defaultHeight.toString())
+            views.stepsInput.setText(preset.defaultSteps.toString())
+            views.cfgInput.setText(preset.defaultCfg.toString())
+            views.loraToggle.isEnabled = preset.supportsLora
+            if (!preset.supportsLora) {
+                views.loraToggle.isChecked = false
+            }
         }
 
         views.shareLogsButton.setOnClickListener { shareLogs() }
@@ -84,6 +90,15 @@ class ImageGenerationActivity : AppCompatActivity() {
 
         // Log initial memory state
         logDemoMemoryState(TAG, "Activity created", includeGpu = true) { FileLogger.i(TAG, it) }
+    }
+
+    private fun selectedPreset(): ImageModelPreset {
+        return when (views.modelPresetGroup.checkedRadioButtonId) {
+            R.id.presetFlux2Bonsai -> ImageModelPreset.FLUX2_KLEIN_BONSAI
+            R.id.presetSd3Medium -> ImageModelPreset.SD3_MEDIUM
+            R.id.presetMiniT2i -> ImageModelPreset.MINI_T2I
+            else -> ImageModelPreset.SD15
+        }
     }
 
     private fun startGeneration() {
@@ -115,25 +130,17 @@ class ImageGenerationActivity : AppCompatActivity() {
         views.progressBar.isIndeterminate = true
         views.generateButton.isEnabled = false
         val prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
-        val flux2Requested = views.flux2Toggle.isChecked
-        val miniT2iRequested = views.miniT2iToggle.isChecked
-        val loraRequested = views.loraToggle.isChecked && !flux2Requested && !miniT2iRequested
+        val preset = selectedPreset()
+        val loraRequested = views.loraToggle.isChecked && preset.supportsLora
 
         val useFlashAttn = width >= 512 && height >= 512
-        val model =
-            when {
-                miniT2iRequested -> ImageGenerationModel.MINI_T2I
-                flux2Requested -> ImageGenerationModel.FLUX2_KLEIN
-                else -> ImageGenerationModel.DEFAULT
-            }
         val baseRequest =
-            ImageGenerationFormSupport.createRequest(
-                model = model,
+            preset.buildRequest(
                 prompt = prompt,
                 width = width,
                 height = height,
                 steps = steps,
-                cfgScale = cfg,
+                cfg = cfg,
                 seed = seed,
                 flashAttention = useFlashAttn,
             )
