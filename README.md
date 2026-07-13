@@ -63,7 +63,8 @@ This example application provides production-ready demonstrations of llmedge's c
 - Demonstrates VAE loading and tensor offloading strategies
 
 **Video Generation** (`VideoGenerationActivity.kt`)
-- Text-to-video synthesis using Wan models
+- Text-to-video synthesis with selectable Wan 2.1 T2V 1.3B and Wan 2.2 TI2V 5B Q6_K models
+- Single-frame (`videoFrames = 1`) image-style output
 - Multi-file model loading (main + VAE + T5XXL)
 - Device capability detection (12GB+ RAM required)
 - Frame-by-frame progress monitoring
@@ -331,7 +332,7 @@ val edge = LLMEdge.create(this, lifecycleScope)
 edge.image.generateVideo(
     VideoGenerationRequest(
         prompt = "cat walking through garden",
-        videoFrames = 8,
+        videoFrames = 9, // Use 1 for a single image-style output
         width = 512,
         height = 512,
         steps = 20,

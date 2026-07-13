@@ -7,17 +7,63 @@ import android.widget.Spinner
 import com.example.llmedgeexample.common.GenerationDemoSupport
 import io.aatricks.llmedge.image.diffusion.SampleMethod
 import io.aatricks.llmedge.image.diffusion.Scheduler
+import io.aatricks.llmedge.model.ModelArtifactKind
+import io.aatricks.llmedge.model.ModelCapability
+import io.aatricks.llmedge.model.ModelHints
+import io.aatricks.llmedge.model.ModelSpec
+
+internal data class VideoModelPreset(
+    val displayName: String,
+    val model: ModelSpec? = null,
+    val vae: ModelSpec? = null,
+    val textEncoder: ModelSpec? = null,
+)
 
 internal object VideoGenerationFormSupport {
+    private const val WAN_22_REPO = "QuantStack/Wan2.2-TI2V-5B-GGUF"
     private val recommendedSamplers = SampleMethod.WAN_RECOMMENDED
     private val orderedSamplers =
         recommendedSamplers + SampleMethod.values().filter { it !in recommendedSamplers }
+    val modelPresets =
+        listOf(
+            VideoModelPreset(displayName = "Wan 2.1 T2V 1.3B (default)"),
+            VideoModelPreset(
+                displayName = "Wan 2.2 TI2V 5B Q6_K",
+                model =
+                    ModelSpec.huggingFace(
+                        repoId = WAN_22_REPO,
+                        filename = "Wan2.2-TI2V-5B-Q6_K.gguf",
+                        hints =
+                            ModelHints(
+                                artifactKind = ModelArtifactKind.DIFFUSION_MODEL,
+                                capabilities = setOf(ModelCapability.IMAGE, ModelCapability.VIDEO),
+                            ),
+                    ),
+                vae =
+                    ModelSpec.huggingFace(
+                        repoId = WAN_22_REPO,
+                        filename = "VAE/Wan2.2_VAE.safetensors",
+                        hints =
+                            ModelHints(
+                                artifactKind = ModelArtifactKind.VAE,
+                                capabilities = setOf(ModelCapability.VIDEO),
+                            ),
+                    ),
+            ),
+        )
 
     fun bindAdapters(
         context: Context,
+        modelSpinner: Spinner,
         samplerSpinner: Spinner,
         schedulerSpinner: Spinner,
     ) {
+        modelSpinner.adapter =
+            ArrayAdapter(
+                context,
+                android.R.layout.simple_spinner_dropdown_item,
+                modelPresets.map(VideoModelPreset::displayName),
+            )
         val samplerNames =
             orderedSamplers.map { sampleMethod ->
                 val displayName = sampleMethod.name.replace("_", " ")
@@ -45,6 +91,9 @@ internal object VideoGenerationFormSupport {
     fun selectedScheduler(position: Int): Scheduler =
         Scheduler.values().getOrElse(position) { Scheduler.DEFAULT }
 
+    fun selectedModelPreset(position: Int): VideoModelPreset =
+        modelPresets.getOrElse(position) { modelPresets.first() }
+
     fun parseDimensionField(
         field: EditText,
         defaultValue: Int,
@@ -65,9 +114,9 @@ internal object VideoGenerationFormSupport {
         GenerationDemoSupport.parseIntField(
             field = field,
             defaultValue = defaultValue,
-            errorMessage = "Frames must be between 4 and 64",
+            errorMessage = "Frames must be between 1 and 64",
         ) { value ->
-            value in 4..64
+            value in 1..64
         }
 
     fun parseFpsField(

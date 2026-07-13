@@ -13,10 +13,17 @@
             android:id="@+id/videoHeading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Wan 1.3B Text → Video"
+            android:text="Wan 2.1 / 2.2 Text → Video"
             android:textColor="@android:color/black"
             android:textSize="18sp"
             android:paddingBottom="12dp" />
+
+        <Spinner
+            android:id="@+id/videoModelSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="Wan model"
+            android:background="@android:drawable/btn_dropdown" />
 
         <EditText
             android:id="@+id/videoPromptInput"
@@ -69,7 +76,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:hint="Frames 5,9,13,17..."
+                android:hint="Frames: 1 or 5, 9, 13..."
                 android:inputType="number"
                 android:text="9"
                 android:background="@android:drawable/edit_text"

@@ -18,7 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * Activity for video generation using Wan 2.1 model.
+ * Activity for video generation using Wan 2.1 and Wan 2.2 models.
  *
  * Supports:
  * - Text-to-Video (T2V) generation
@@ -91,7 +91,12 @@ class VideoGenerationActivity : AppCompatActivity() {
         views.progressBar.progress = 0
         views.progressBar.visibility = View.GONE
 
-        VideoGenerationFormSupport.bindAdapters(this, views.samplerSpinner, views.schedulerSpinner)
+        VideoGenerationFormSupport.bindAdapters(
+            this,
+            views.modelSpinner,
+            views.samplerSpinner,
+            views.schedulerSpinner,
+        )
 
         views.generateButton.setOnClickListener { startGeneration() }
         views.cancelButton.setOnClickListener { cancelGeneration() }
@@ -348,6 +353,8 @@ class VideoGenerationActivity : AppCompatActivity() {
         val cfg = VideoGenerationFormSupport.parseCfgField(views.cfgInput, DEFAULT_CFG) ?: return null
         val seed = VideoGenerationFormSupport.parseSeedField(views.seedInput, DEFAULT_SEED) ?: return null
         val flowShift = VideoGenerationFormSupport.parseFlowShiftField(views.flowShiftInput) ?: return null
+        val modelPreset =
+            VideoGenerationFormSupport.selectedModelPreset(views.modelSpinner.selectedItemPosition)
 
         return VideoGenerationConfig(
             prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT },
@@ -359,6 +366,9 @@ class VideoGenerationActivity : AppCompatActivity() {
             cfgScale = cfg,
             seed = seed,
             flowShift = flowShift,
+            model = modelPreset.model,
+            vae = modelPreset.vae,
+            textEncoder = modelPreset.textEncoder,
             sampleMethod = VideoGenerationFormSupport.selectedSampleMethod(views.samplerSpinner.selectedItemPosition),
             scheduler = VideoGenerationFormSupport.selectedScheduler(views.schedulerSpinner.selectedItemPosition),
             loraDirectory = selectedLoraPath,
