@@ -3,6 +3,7 @@ package com.example.llmedgeexample.common
 import android.content.Context
 import androidx.lifecycle.LifecycleOwner
 import io.aatricks.llmedge.ComputeBackendAvailability
+import io.aatricks.llmedge.DiffusionWorkerMode
 import io.aatricks.llmedge.ImageRuntimeConfig
 import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.LLMEdgeConfig
@@ -28,7 +29,20 @@ fun bindEdge(
             config =
                 LLMEdgeConfig(
                     text = TextRuntimeConfig(useVulkan = !isCpuOnlyForced(context)),
-                    image = ImageRuntimeConfig(preferPerformanceMode = preferPerformanceMode && !isCpuOnlyForced(context)),
+                    // "Force CPU only" must also cover image/video: on devices whose Vulkan driver
+                    // loads but crashes/deadlocks at the first compute dispatch (e.g. some Mali /
+                    // PowerVR parts), useVulkan=false is the only escape hatch in IN_PROCESS mode.
+                    image =
+                        ImageRuntimeConfig(
+                            // Run image/video generation in the library's :llmedge_sd worker process
+                            // so a native GPU-driver crash/hang is contained and auto-retried on CPU
+                            // (hangRecoveryPolicy defaults to RETRY_CPU_THEN_FAIL; the broken backend
+                            // is blacklisted + persisted per device). Observed on the Dimensity 7025's
+                            // Mali driver, which loads Vulkan then crashes at the first compute dispatch.
+                            workerMode = DiffusionWorkerMode.ISOLATED_PROCESS,
+                            useVulkan = !isCpuOnlyForced(context),
+                            preferPerformanceMode = preferPerformanceMode && !isCpuOnlyForced(context),
+                        ),
                 ),
         ),
     )
