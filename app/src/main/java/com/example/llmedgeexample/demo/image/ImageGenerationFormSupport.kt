@@ -1,8 +1,62 @@
 package com.example.llmedgeexample.demo.image
 
 import com.example.llmedgeexample.common.GenerationDemoSupport
+import io.aatricks.llmedge.image.Flux2Klein
+import io.aatricks.llmedge.image.ImageGenerationRequest
+import io.aatricks.llmedge.image.MiniT2I
+import io.aatricks.llmedge.image.diffusion.LoraApplyMode
+
+internal enum class ImageGenerationModel {
+    DEFAULT,
+    FLUX2_KLEIN,
+    MINI_T2I,
+}
 
 internal object ImageGenerationFormSupport {
+    fun createRequest(
+        model: ImageGenerationModel,
+        prompt: String,
+        width: Int,
+        height: Int,
+        steps: Int,
+        cfgScale: Float,
+        seed: Long,
+        flashAttention: Boolean,
+    ): ImageGenerationRequest =
+        when (model) {
+            ImageGenerationModel.FLUX2_KLEIN ->
+                Flux2Klein.bonsaiImageRequest(
+                    prompt = prompt,
+                    width = width,
+                    height = height,
+                    seed = seed,
+                    flashAttention = flashAttention,
+                )
+            ImageGenerationModel.MINI_T2I ->
+                MiniT2I.imageRequest(
+                    prompt = prompt,
+                    width = width,
+                    height = height,
+                    steps = steps,
+                    cfgScale = cfgScale,
+                    seed = seed,
+                    flashAttention = flashAttention,
+                )
+            ImageGenerationModel.DEFAULT ->
+                ImageGenerationRequest(
+                    prompt = prompt,
+                    width = width,
+                    height = height,
+                    steps = steps,
+                    cfgScale = cfgScale,
+                    seed = seed,
+                    flashAttention = flashAttention,
+                    forceSequentialLoad = false,
+                    loraModelDir = null,
+                    loraApplyMode = LoraApplyMode.AUTO,
+                )
+        }
+
     fun parseDimensionField(
         field: android.widget.EditText,
         defaultValue: Int,
@@ -23,9 +77,9 @@ internal object ImageGenerationFormSupport {
         GenerationDemoSupport.parseIntField(
             field = field,
             defaultValue = defaultValue,
-            errorMessage = "Steps must be between 1 and 50",
+            errorMessage = "Steps must be between 1 and 100",
         ) { value ->
-            value in 1..50
+            value in 1..100
         }
 
     fun parseCfgField(

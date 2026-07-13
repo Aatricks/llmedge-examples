@@ -56,6 +56,7 @@ This example application provides production-ready demonstrations of llmedge's c
 
 **Image Generation** (`StableDiffusionActivity.kt`)
 - Text-to-image synthesis using Stable Diffusion
+- Selectable MiniT2I B/16 support with its FLAN-T5 Large text encoder
 - LoRA Support: Toggle switch to apply Detail Tweaker LoRA, automatically downloaded from Hugging Face
 - EasyCache: Auto-enabled acceleration for supported DiT models (Flux, SD3, Wan, Qwen Image, Z-Image)
 - Memory-aware configuration options

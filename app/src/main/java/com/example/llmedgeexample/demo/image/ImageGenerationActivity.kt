@@ -7,9 +7,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import io.aatricks.llmedge.image.diffusion.LoraApplyMode
-import io.aatricks.llmedge.image.Flux2Klein
-import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.GenerationMetrics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -74,6 +71,12 @@ class ImageGenerationActivity : AppCompatActivity() {
                 Toast.makeText(this, "Detail Tweaker LoRA Disabled", Toast.LENGTH_SHORT).show()
             }
         }
+        views.flux2Toggle.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) views.miniT2iToggle.isChecked = false
+        }
+        views.miniT2iToggle.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) views.flux2Toggle.isChecked = false
+        }
 
         // Log initial memory state
         logDemoMemoryState(TAG, "Activity created", includeGpu = true)
@@ -109,35 +112,27 @@ class ImageGenerationActivity : AppCompatActivity() {
         views.generateButton.isEnabled = false
         val prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
         val flux2Requested = views.flux2Toggle.isChecked
-        // FLUX.2 Klein is a split-model DiT pipeline; LoRA / Detail-Tweaker doesn't apply to it.
-        val loraRequested = views.loraToggle.isChecked && !flux2Requested
+        val miniT2iRequested = views.miniT2iToggle.isChecked
+        val loraRequested = views.loraToggle.isChecked && !flux2Requested && !miniT2iRequested
 
         val useFlashAttn = width >= 512 && height >= 512
-        val baseRequest =
-            if (flux2Requested) {
-                // Bonsai ternary Q2_K DiT (~1.3 GB) with sequential loading — peak RAM ≈ 2.6 GB,
-                // the low-memory FLUX.2 Klein path suited to ≤8 GB devices.
-                Flux2Klein.bonsaiImageRequest(
-                    prompt = prompt,
-                    width = width,
-                    height = height,
-                    seed = seed,
-                    flashAttention = useFlashAttn,
-                )
-            } else {
-                ImageGenerationRequest(
-                    prompt = prompt,
-                    width = width,
-                    height = height,
-                    steps = steps,
-                    cfgScale = cfg,
-                    seed = seed,
-                    flashAttention = useFlashAttn,
-                    forceSequentialLoad = false,
-                    loraModelDir = null,
-                    loraApplyMode = LoraApplyMode.AUTO,
-                )
+        val model =
+            when {
+                miniT2iRequested -> ImageGenerationModel.MINI_T2I
+                flux2Requested -> ImageGenerationModel.FLUX2_KLEIN
+                else -> ImageGenerationModel.DEFAULT
             }
+        val baseRequest =
+            ImageGenerationFormSupport.createRequest(
+                model = model,
+                prompt = prompt,
+                width = width,
+                height = height,
+                steps = steps,
+                cfgScale = cfg,
+                seed = seed,
+                flashAttention = useFlashAttn,
+            )
 
         requestPreparationJob =
             lifecycleScope.launch {
