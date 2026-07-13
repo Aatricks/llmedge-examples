@@ -113,19 +113,38 @@
             android:layout_marginTop="12dp"
             android:text="Use Detail Tweaker LoRA" />
 
-        <Switch
-            android:id="@+id/flux2Toggle"
-            android:layout_width="wrap_content"
+        <RadioGroup
+            android:id="@+id/modelPresetGroup"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="FLUX.2 Klein 4B — Bonsai ternary Q2_K (~3.5GB DL, sequential load, ~6GB+ RAM)" />
+            android:orientation="vertical">
 
-        <Switch
-            android:id="@+id/miniT2iToggle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="MiniT2I B/16 — FLAN-T5 Large (512×512, 100 steps, CFG 6 recommended)" />
+            <RadioButton
+                android:id="@+id/presetSd15"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="SD 1.5 (MeinaMix)" />
+
+            <RadioButton
+                android:id="@+id/presetFlux2Bonsai"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FLUX.2 Klein 4B — Bonsai ternary Q2_K (~3.5GB DL, sequential load)" />
+
+            <RadioButton
+                android:id="@+id/presetSd3Medium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SD3 Medium — split DiT + CLIP-L/G (~3.1GB DL, 28 steps, CFG 4.5)" />
+
+            <RadioButton
+                android:id="@+id/presetMiniT2i"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MiniT2I B/16 — FLAN-T5 Large (512×512, 100 steps, CFG 6)" />
+        </RadioGroup>
 
         <LinearLayout
             android:layout_width="match_parent"

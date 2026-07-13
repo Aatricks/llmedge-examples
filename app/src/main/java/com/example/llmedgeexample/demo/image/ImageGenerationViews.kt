@@ -5,6 +5,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.RadioGroup
 import android.widget.Switch
 import android.widget.TextView
 import com.example.llmedgeexample.R
@@ -23,8 +24,7 @@ internal data class ImageGenerationViews(
     val previewImage: ImageView,
     val metricsLabel: TextView,
     val loraToggle: Switch,
-    val flux2Toggle: Switch,
-    val miniT2iToggle: Switch,
+    val modelPresetGroup: RadioGroup,
     val shareLogsButton: Button,
     val logPathLabel: TextView,
 ) {
@@ -44,8 +44,7 @@ internal data class ImageGenerationViews(
                 previewImage = activity.findViewById(R.id.videoPreview),
                 metricsLabel = activity.findViewById(R.id.videoMetricsLabel),
                 loraToggle = activity.findViewById(R.id.loraToggle),
-                flux2Toggle = activity.findViewById(R.id.flux2Toggle),
-                miniT2iToggle = activity.findViewById(R.id.miniT2iToggle),
+                modelPresetGroup = activity.findViewById(R.id.modelPresetGroup),
                 shareLogsButton = activity.findViewById(R.id.btnShareLogs),
                 logPathLabel = activity.findViewById(R.id.logPathLabel),
             )
