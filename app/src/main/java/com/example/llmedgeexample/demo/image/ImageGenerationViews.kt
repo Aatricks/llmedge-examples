@@ -24,6 +24,7 @@ internal data class ImageGenerationViews(
     val metricsLabel: TextView,
     val loraToggle: Switch,
     val flux2Toggle: Switch,
+    val miniT2iToggle: Switch,
 ) {
     companion object {
         fun bind(activity: Activity): ImageGenerationViews =
@@ -42,6 +43,7 @@ internal data class ImageGenerationViews(
                 metricsLabel = activity.findViewById(R.id.videoMetricsLabel),
                 loraToggle = activity.findViewById(R.id.loraToggle),
                 flux2Toggle = activity.findViewById(R.id.flux2Toggle),
+                miniT2iToggle = activity.findViewById(R.id.miniT2iToggle),
             )
     }
 }
