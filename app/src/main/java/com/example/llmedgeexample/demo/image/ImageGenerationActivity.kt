@@ -97,6 +97,7 @@ class ImageGenerationActivity : AppCompatActivity() {
             R.id.presetFlux2Bonsai -> ImageModelPreset.FLUX2_KLEIN_BONSAI
             R.id.presetSd3Medium -> ImageModelPreset.SD3_MEDIUM
             R.id.presetMiniT2i -> ImageModelPreset.MINI_T2I
+            R.id.presetMiniT2iLarge -> ImageModelPreset.MINI_T2I_LARGE
             else -> ImageModelPreset.SD15
         }
     }
@@ -166,17 +167,18 @@ class ImageGenerationActivity : AppCompatActivity() {
 
                     logDemoMemoryState(TAG, "Before image generation", includeGpu = true) { FileLogger.i(TAG, it) }
 
+                    val executionOverride = prepared.request.sequential?.toString() ?: "AUTO"
                     val submitLog =
                         "Submitting image request: width=${prepared.request.width}, height=${prepared.request.height}, steps=${prepared.request.steps}, " +
                             "flash=${prepared.request.flashAttention}, easyCache=${prepared.request.easyCache.enabled}, " +
-                            "sequential=${prepared.request.forceSequentialLoad}, loraRequested=$loraRequested, " +
+                            "executionOverride=$executionOverride, nativeSequentialLoad=${prepared.request.forceSequentialLoad}, loraRequested=$loraRequested, " +
                             "loraApplied=${prepared.loraApplied}, loraDir=${prepared.request.loraModelDir ?: "none"}"
                     FileLogger.i(TAG, submitLog)
                     android.util.Log.i(
                         TAG,
                         "Submitting image request: width=${prepared.request.width}, height=${prepared.request.height}, steps=${prepared.request.steps}, " +
                             "flash=${prepared.request.flashAttention}, easyCache=${prepared.request.easyCache.enabled}, " +
-                            "sequential=${prepared.request.forceSequentialLoad}, loraRequested=$loraRequested, " +
+                            "executionOverride=$executionOverride, nativeSequentialLoad=${prepared.request.forceSequentialLoad}, loraRequested=$loraRequested, " +
                             "loraApplied=${prepared.loraApplied}, loraDir=${prepared.request.loraModelDir ?: "none"}",
                     )
 

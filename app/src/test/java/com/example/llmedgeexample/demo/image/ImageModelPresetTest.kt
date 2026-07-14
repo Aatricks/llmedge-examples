@@ -29,6 +29,10 @@ class ImageModelPresetTest {
         assertEquals(6.0f, ImageModelPreset.MINI_T2I.defaultCfg)
         assertFalse(ImageModelPreset.MINI_T2I.supportsLora)
 
+        assertEquals(100, ImageModelPreset.MINI_T2I_LARGE.defaultSteps)
+        assertEquals(6.0f, ImageModelPreset.MINI_T2I_LARGE.defaultCfg)
+        assertFalse(ImageModelPreset.MINI_T2I_LARGE.supportsLora)
+
         ImageModelPreset.values().forEach { preset ->
             assertEquals(512, preset.defaultWidth)
             assertEquals(512, preset.defaultHeight)
@@ -52,7 +56,7 @@ class ImageModelPresetTest {
         assertNull(request.clipL)
         assertNull(request.clipG)
         assertFalse(request.splitDiffusionModel)
-        assertFalse(request.sequential)
+        assertNull(request.sequential)
         assertEquals(20, request.steps)
         assertEquals(7.0f, request.cfgScale)
     }
@@ -73,7 +77,7 @@ class ImageModelPresetTest {
         assertEquals(Flux2Klein.vae, request.vae)
         assertEquals(Flux2Klein.textEncoder, request.textEncoder)
         assertTrue(request.splitDiffusionModel)
-        assertTrue(request.sequential)
+        assertEquals(true, request.sequential)
         assertEquals(4, request.steps)
     }
 
@@ -96,7 +100,7 @@ class ImageModelPresetTest {
         assertEquals(Sd3Medium.t5xxl, request.t5xxl)
         assertNull(request.textEncoder)
         assertTrue(request.splitDiffusionModel)
-        assertFalse(request.sequential)
+        assertNull(request.sequential)
         assertEquals(28, request.steps)
         assertEquals(4.5f, request.cfgScale)
     }
@@ -118,5 +122,26 @@ class ImageModelPresetTest {
         assertTrue(request.diffusionModelOnly)
         assertEquals(100, request.steps)
         assertEquals(6.0f, request.cfgScale)
+        assertNull(request.sequential)
+    }
+
+    @Test
+    fun testBuildRequestMiniT2iLarge() {
+        val request = ImageModelPreset.MINI_T2I_LARGE.buildRequest(
+            prompt = "a small robot",
+            width = 512,
+            height = 512,
+            steps = 100,
+            cfg = 6.0f,
+            seed = 42L,
+            flashAttention = true,
+        )
+
+        assertEquals(MiniT2I.diffusionModelLarge, request.model)
+        assertEquals(MiniT2I.textEncoder, request.textEncoder)
+        assertTrue(request.diffusionModelOnly)
+        assertEquals(100, request.steps)
+        assertEquals(6.0f, request.cfgScale)
+        assertNull(request.sequential)
     }
 }
