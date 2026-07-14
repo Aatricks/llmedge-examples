@@ -137,7 +137,7 @@
                 android:id="@+id/presetSd3Medium"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SD3 Medium — split DiT + CLIP-L/G (~3.1GB DL, 28 steps, CFG 4.5)" />
+                android:text="SD3 Medium — split DiT + CLIP-L/G + T5XXL FP8 (full T5XXL FP8 conditioning, ~8.0GB total download)" />
 
             <RadioButton
                 android:id="@+id/presetMiniT2i"
