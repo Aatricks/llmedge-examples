@@ -93,6 +93,7 @@ class ImageModelPresetTest {
         assertEquals(Sd3Medium.vae, request.vae)
         assertEquals(Sd3Medium.clipL, request.clipL)
         assertEquals(Sd3Medium.clipG, request.clipG)
+        assertEquals(Sd3Medium.t5xxl, request.t5xxl)
         assertNull(request.textEncoder)
         assertTrue(request.splitDiffusionModel)
         assertFalse(request.sequential)
