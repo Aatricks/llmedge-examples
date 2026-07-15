@@ -2,11 +2,15 @@ package com.example.llmedgeexample.demo.image
 
 import android.graphics.Bitmap
 import io.aatricks.llmedge.image.ImageGenerationRequest
+import io.aatricks.llmedge.image.GenerationStreamEvent
 import io.aatricks.llmedge.image.diffusion.GenerationMetrics
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -123,6 +127,36 @@ class ImageGenerationControllerTest {
         assertEquals("idle", controller.currentPhaseText())
     }
 
+    @Test
+    fun `generateStream progress updates percents and completes with bitmap`() = runBlocking {
+        val runtime = FakeImageGenerationRuntime().apply {
+            emitProgressInTest = true
+        }
+        val controller = newController(runtime, this)
+        val callbacks = RecordingCallbacks()
+
+        controller.start(
+            config = ImageGenerationConfig(
+                request = ImageGenerationRequest(prompt = "test progress", width = 128, height = 128, steps = 4),
+            ),
+            callbacks = callbacks.asCallbacks(),
+        )
+
+        waitUntil { runtime.enteredGenerate }
+        val mockBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        runtime.complete(mockBitmap)
+        waitUntil { callbacks.finishedCount == 1 }
+
+        val activePercents = callbacks.progressPercents.filter { it >= 1 }
+        assertTrue("Expected at least one progress percent >= 1", activePercents.isNotEmpty())
+        for (i in 0 until activePercents.size - 1) {
+            assertTrue("Expected strictly increasing percents, got $activePercents", activePercents[i] < activePercents[i + 1])
+        }
+
+        assertNotNull(callbacks.completed)
+        assertEquals(mockBitmap, callbacks.completed?.bitmap)
+    }
+
     private fun newController(
         runtime: FakeImageGenerationRuntime,
         scope: CoroutineScope,
@@ -153,11 +187,33 @@ class ImageGenerationControllerTest {
             private set
         var cancelCalls: Int = 0
             private set
+        var emitProgressInTest: Boolean = false
 
         override suspend fun generate(request: ImageGenerationRequest): Bitmap {
             enteredGenerate = true
             return result.await()
         }
+
+        override fun generateStream(request: ImageGenerationRequest): Flow<GenerationStreamEvent> =
+            kotlinx.coroutines.flow.callbackFlow {
+                enteredGenerate = true
+                val job = launch {
+                    try {
+                        if (emitProgressInTest) {
+                            trySend(GenerationStreamEvent.Progress(io.aatricks.llmedge.core.ProgressEvent.Step("Sampling", 1, 4)))
+                            trySend(GenerationStreamEvent.Progress(io.aatricks.llmedge.core.ProgressEvent.Step("Sampling", 2, 4)))
+                        }
+                        val bitmap = result.await()
+                        trySend(GenerationStreamEvent.Completed(listOf(bitmap)))
+                        close()
+                    } catch (e: Throwable) {
+                        close(e)
+                    }
+                }
+                awaitClose {
+                    job.cancel()
+                }
+            }
 
         override fun cancelGeneration() {
             cancelCalls += 1
@@ -173,13 +229,17 @@ class ImageGenerationControllerTest {
 
     private class RecordingCallbacks {
         val progressMessages = mutableListOf<String>()
+        val progressPercents = mutableListOf<Int>()
         var completed: ImageGenerationResult? = null
         var cancelledReason: ImageGenerationCancellationReason? = null
         var finishedCount: Int = 0
 
         fun asCallbacks(): ImageGenerationCallbacks =
             ImageGenerationCallbacks(
-                onProgress = { _, status -> progressMessages += status },
+                onProgress = { percent, status ->
+                    progressPercents += percent
+                    progressMessages += status
+                },
                 onCompleted = { completed = it },
                 onCancelled = { _, reason, _ -> cancelledReason = reason },
                 onFinished = { finishedCount += 1 },

@@ -2,7 +2,9 @@ package com.example.llmedgeexample.demo.image
 
 import android.graphics.Bitmap
 import com.example.llmedgeexample.common.FileLogger
+import com.example.llmedgeexample.common.StepEtaEstimator
 import io.aatricks.llmedge.LLMEdge
+import io.aatricks.llmedge.image.GenerationStreamEvent
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.GenerationMetrics
 import java.util.concurrent.atomic.AtomicLong
@@ -12,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -50,6 +53,8 @@ internal data class ImageGenerationCallbacks(
 internal interface ImageGenerationRuntime {
     suspend fun generate(request: ImageGenerationRequest): Bitmap
 
+    fun generateStream(request: ImageGenerationRequest): Flow<GenerationStreamEvent>
+
     fun cancelGeneration()
 
     fun getLastGenerationMetrics(): GenerationMetrics?
@@ -59,6 +64,9 @@ internal class EdgeImageGenerationRuntime(
     private val edge: LLMEdge,
 ) : ImageGenerationRuntime {
     override suspend fun generate(request: ImageGenerationRequest): Bitmap = edge.image.generate(request)
+
+    override fun generateStream(request: ImageGenerationRequest): Flow<GenerationStreamEvent> =
+        edge.image.generateStream(request)
 
     override fun cancelGeneration() {
         edge.image.cancelGeneration()
@@ -116,7 +124,22 @@ internal class ImageGenerationController(
                         callbacks.onProgress(0, "Generating image...")
                     }
 
-                    val bitmap = runtime.generate(config.request)
+                    val estimator = StepEtaEstimator()
+                    var bitmap: Bitmap? = null
+                    runtime.generateStream(config.request).collect { event ->
+                        when (event) {
+                            is GenerationStreamEvent.Progress -> {
+                                val snap = estimator.onStep(event.update.current, event.update.total)
+                                withContext(mainDispatcher) {
+                                    callbacks.onProgress(snap.percent, snap.label)
+                                }
+                            }
+                            is GenerationStreamEvent.Completed -> {
+                                bitmap = event.frames.first()
+                            }
+                        }
+                    }
+                    val finalBitmap = bitmap ?: throw IllegalStateException("Stream completed without a bitmap")
                     val metrics = runtime.getLastGenerationMetrics()
                     logInfo(
                         "Image request completed: requestId=$requestId, phase=$currentPhaseText, metricsAvailable=${metrics != null}",
@@ -126,7 +149,7 @@ internal class ImageGenerationController(
                         callbacks.onCompleted(
                             ImageGenerationResult(
                                 requestId = requestId,
-                                bitmap = bitmap,
+                                bitmap = finalBitmap,
                                 metrics = metrics,
                             ),
                         )

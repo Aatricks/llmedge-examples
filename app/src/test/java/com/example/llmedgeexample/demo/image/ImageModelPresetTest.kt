@@ -52,7 +52,7 @@ class ImageModelPresetTest {
         assertNull(request.clipL)
         assertNull(request.clipG)
         assertFalse(request.splitDiffusionModel)
-        assertFalse(request.sequential)
+        assertNull(request.sequential)
         assertEquals(20, request.steps)
         assertEquals(7.0f, request.cfgScale)
     }
@@ -73,7 +73,7 @@ class ImageModelPresetTest {
         assertEquals(Flux2Klein.vae, request.vae)
         assertEquals(Flux2Klein.textEncoder, request.textEncoder)
         assertTrue(request.splitDiffusionModel)
-        assertTrue(request.sequential)
+        assertEquals(true, request.sequential)
         assertEquals(4, request.steps)
     }
 
@@ -95,7 +95,7 @@ class ImageModelPresetTest {
         assertEquals(Sd3Medium.clipG, request.clipG)
         assertNull(request.textEncoder)
         assertTrue(request.splitDiffusionModel)
-        assertFalse(request.sequential)
+        assertNull(request.sequential)
         assertEquals(28, request.steps)
         assertEquals(4.5f, request.cfgScale)
     }
