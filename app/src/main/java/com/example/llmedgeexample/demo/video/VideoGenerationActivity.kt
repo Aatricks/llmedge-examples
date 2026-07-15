@@ -358,6 +358,7 @@ class VideoGenerationActivity : AppCompatActivity() {
 
         return VideoGenerationConfig(
             prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT },
+            negative = views.negativePromptInput.text.toString().trim(),
             width = width,
             height = height,
             frames = framesCount,

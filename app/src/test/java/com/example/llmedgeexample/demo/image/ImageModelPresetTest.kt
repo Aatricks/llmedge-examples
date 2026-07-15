@@ -191,8 +191,39 @@ class ImageModelPresetTest {
 
         assertEquals(io.aatricks.llmedge.image.ChromaRadiance.mobileDiffusionModel, request.model)
         assertEquals(io.aatricks.llmedge.image.ChromaRadiance.t5xxl, request.t5xxl)
-        assertNull(request.vae)
+        assertEquals(io.aatricks.llmedge.image.ChromaRadiance.fluxVae, request.vae)
         assertTrue(request.splitDiffusionModel)
         assertEquals(true, request.sequential)
+    }
+
+    @Test
+    fun testBuildRequestPassesNegativePrompt() {
+        ImageModelPreset.values().forEach { preset ->
+            val request = preset.buildRequest(
+                prompt = "a small robot",
+                negative = "blurry, low quality",
+                width = 512,
+                height = 512,
+                steps = preset.defaultSteps,
+                cfg = preset.defaultCfg,
+                seed = 42L,
+                flashAttention = true,
+            )
+            assertEquals("blurry, low quality", request.negative)
+        }
+    }
+
+    @Test
+    fun testBuildRequestDefaultsToEmptyNegativePrompt() {
+        val request = ImageModelPreset.SD15.buildRequest(
+            prompt = "a small robot",
+            width = 512,
+            height = 512,
+            steps = 20,
+            cfg = 7.0f,
+            seed = 42L,
+            flashAttention = true,
+        )
+        assertEquals("", request.negative)
     }
 }

@@ -22,6 +22,7 @@ import kotlinx.coroutines.withContext
 
 data class VideoGenerationConfig(
     val prompt: String,
+    val negative: String = "",
     val width: Int,
     val height: Int,
     val frames: Int,
@@ -115,6 +116,7 @@ class VideoGenerationController(
                     val request =
                         VideoGenerationRequest(
                             prompt = config.prompt,
+                            negative = config.negative,
                             width = config.width,
                             height = config.height,
                             videoFrames = config.frames,

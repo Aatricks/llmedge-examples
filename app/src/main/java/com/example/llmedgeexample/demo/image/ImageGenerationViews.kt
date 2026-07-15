@@ -12,6 +12,7 @@ import com.example.llmedgeexample.R
 
 internal data class ImageGenerationViews(
     val promptInput: EditText,
+    val negativePromptInput: EditText,
     val widthInput: EditText,
     val heightInput: EditText,
     val stepsInput: EditText,
@@ -32,6 +33,7 @@ internal data class ImageGenerationViews(
         fun bind(activity: Activity): ImageGenerationViews =
             ImageGenerationViews(
                 promptInput = activity.findViewById(R.id.videoPromptInput),
+                negativePromptInput = activity.findViewById(R.id.imageNegativePromptInput),
                 widthInput = activity.findViewById(R.id.imageWidthInput),
                 heightInput = activity.findViewById(R.id.imageHeightInput),
                 stepsInput = activity.findViewById(R.id.imageStepsInput),
