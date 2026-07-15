@@ -33,6 +33,10 @@ class ImageModelPresetTest {
         assertEquals(6.0f, ImageModelPreset.MINI_T2I_LARGE.defaultCfg)
         assertFalse(ImageModelPreset.MINI_T2I_LARGE.supportsLora)
 
+        assertEquals(20, ImageModelPreset.CHROMA_RADIANCE.defaultSteps)
+        assertEquals(4.0f, ImageModelPreset.CHROMA_RADIANCE.defaultCfg)
+        assertFalse(ImageModelPreset.CHROMA_RADIANCE.supportsLora)
+
         ImageModelPreset.values().forEach { preset ->
             assertEquals(512, preset.defaultWidth)
             assertEquals(512, preset.defaultHeight)
@@ -143,5 +147,29 @@ class ImageModelPresetTest {
         assertEquals(100, request.steps)
         assertEquals(6.0f, request.cfgScale)
         assertNull(request.sequential)
+    }
+
+    @Test
+    fun testBuildRequestChromaRadiance() {
+        val request = ImageModelPreset.CHROMA_RADIANCE.buildRequest(
+            prompt = "a small robot",
+            width = 512,
+            height = 512,
+            steps = 20,
+            cfg = 4.0f,
+            seed = 42L,
+            flashAttention = true,
+        )
+
+        assertEquals(io.aatricks.llmedge.image.ChromaRadiance.diffusionModel, request.model)
+        assertEquals(io.aatricks.llmedge.image.ChromaRadiance.t5xxl, request.t5xxl)
+        assertNull(request.vae)
+        assertNull(request.clipL)
+        assertNull(request.clipG)
+        assertNull(request.textEncoder)
+        assertTrue(request.splitDiffusionModel)
+        assertEquals(true, request.sequential)
+        assertEquals(20, request.steps)
+        assertEquals(4.0f, request.cfgScale)
     }
 }

@@ -20,13 +20,63 @@ internal data class VideoModelPreset(
 )
 
 internal object VideoGenerationFormSupport {
+    private const val WAN_21_GGUF_REPO = "samuelchristlie/Wan2.1-T2V-1.3B-GGUF"
+    private const val WAN_21_REPO = "Comfy-Org/Wan_2.1_ComfyUI_repackaged"
+    private const val WAN_T5_REPO = "city96/umt5-xxl-encoder-gguf"
     private const val WAN_22_REPO = "QuantStack/Wan2.2-TI2V-5B-GGUF"
     private val recommendedSamplers = SampleMethod.WAN_RECOMMENDED
     private val orderedSamplers =
         recommendedSamplers + SampleMethod.values().filter { it !in recommendedSamplers }
     val modelPresets =
         listOf(
-            VideoModelPreset(displayName = "Wan 2.1 T2V 1.3B (default)"),
+            VideoModelPreset(
+                displayName = "Wan 2.1 T2V 1.3B Q3_K_S (mobile default)",
+                model =
+                    ModelSpec.huggingFace(
+                        repoId = WAN_21_GGUF_REPO,
+                        filename = "Wan2.1-T2V-1.3B-Q3_K_S.gguf",
+                        hints =
+                            ModelHints(
+                                artifactKind = ModelArtifactKind.DIFFUSION_MODEL,
+                                capabilities = setOf(ModelCapability.IMAGE, ModelCapability.VIDEO),
+                            ),
+                    ),
+                vae =
+                    ModelSpec.huggingFace(
+                        repoId = WAN_21_REPO,
+                        filename = "wan_2.1_vae.safetensors",
+                        hints =
+                            ModelHints(
+                                artifactKind = ModelArtifactKind.VAE,
+                                capabilities = setOf(ModelCapability.VIDEO),
+                            ),
+                    ),
+                textEncoder = wanTextEncoder(),
+            ),
+            VideoModelPreset(
+                displayName = "Wan 2.1 T2V 1.3B fp16 (high memory)",
+                model =
+                    ModelSpec.huggingFace(
+                        repoId = WAN_21_REPO,
+                        filename = "wan2.1_t2v_1.3B_fp16.safetensors",
+                        hints =
+                            ModelHints(
+                                artifactKind = ModelArtifactKind.DIFFUSION_MODEL,
+                                capabilities = setOf(ModelCapability.IMAGE, ModelCapability.VIDEO),
+                            ),
+                    ),
+                vae =
+                    ModelSpec.huggingFace(
+                        repoId = WAN_21_REPO,
+                        filename = "wan_2.1_vae.safetensors",
+                        hints =
+                            ModelHints(
+                                artifactKind = ModelArtifactKind.VAE,
+                                capabilities = setOf(ModelCapability.VIDEO),
+                            ),
+                    ),
+                textEncoder = wanTextEncoder(),
+            ),
             VideoModelPreset(
                 displayName = "Wan 2.2 TI2V 5B Q6_K",
                 model =
@@ -50,6 +100,17 @@ internal object VideoGenerationFormSupport {
                             ),
                     ),
             ),
+        )
+
+    private fun wanTextEncoder(): ModelSpec =
+        ModelSpec.huggingFace(
+            repoId = WAN_T5_REPO,
+            filename = "umt5-xxl-encoder-Q3_K_S.gguf",
+            hints =
+                ModelHints(
+                    artifactKind = ModelArtifactKind.TEXT_ENCODER,
+                    capabilities = setOf(ModelCapability.TEXT, ModelCapability.VIDEO),
+                ),
         )
 
     fun bindAdapters(

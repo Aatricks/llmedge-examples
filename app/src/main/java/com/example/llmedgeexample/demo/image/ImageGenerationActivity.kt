@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Activity for image generation supporting SD 1.5 (MeinaMix), FLUX.2 Klein Bonsai,
- * SD3 Medium, and MiniT2I.
+ * SD3 Medium, MiniT2I, and Chroma Radiance.
  *
  * Optimized for memory efficiency with:
  * - Proper model loading/unloading via LLMEdge
@@ -98,6 +98,7 @@ class ImageGenerationActivity : AppCompatActivity() {
             R.id.presetSd3Medium -> ImageModelPreset.SD3_MEDIUM
             R.id.presetMiniT2i -> ImageModelPreset.MINI_T2I
             R.id.presetMiniT2iLarge -> ImageModelPreset.MINI_T2I_LARGE
+            R.id.presetChromaRadiance -> ImageModelPreset.CHROMA_RADIANCE
             else -> ImageModelPreset.SD15
         }
     }

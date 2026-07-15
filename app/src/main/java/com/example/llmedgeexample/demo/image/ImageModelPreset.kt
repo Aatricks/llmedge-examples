@@ -4,6 +4,7 @@ import io.aatricks.llmedge.image.Flux2Klein
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.MiniT2I
 import io.aatricks.llmedge.image.Sd3Medium
+import io.aatricks.llmedge.image.ChromaRadiance
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
 
 internal enum class ImageModelPreset(
@@ -17,7 +18,8 @@ internal enum class ImageModelPreset(
     FLUX2_KLEIN_BONSAI(512, 512, 4, 1.0f, false),
     SD3_MEDIUM(512, 512, 28, 4.5f, false),
     MINI_T2I(512, 512, 100, 6.0f, false),
-    MINI_T2I_LARGE(512, 512, 100, 6.0f, false);
+    MINI_T2I_LARGE(512, 512, 100, 6.0f, false),
+    CHROMA_RADIANCE(512, 512, 20, 4.0f, false);
 
     fun buildRequest(
         prompt: String,
@@ -69,6 +71,15 @@ internal enum class ImageModelPreset(
                 flashAttention = flashAttention,
             )
             MINI_T2I_LARGE -> MiniT2I.largeImageRequest(
+                prompt = prompt,
+                width = width,
+                height = height,
+                steps = steps,
+                cfgScale = cfg,
+                seed = seed,
+                flashAttention = flashAttention,
+            )
+            CHROMA_RADIANCE -> ChromaRadiance.imageRequest(
                 prompt = prompt,
                 width = width,
                 height = height,
