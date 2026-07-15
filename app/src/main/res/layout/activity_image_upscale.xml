@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/upscaleHeading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="IMAGE UPSCALER (REMACRI 4X)"
+            android:textColor="@android:color/black"
+            android:textSize="18sp"
+            android:paddingBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <Button
+                android:id="@+id/btnPickImage"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="PICK IMAGE" />
+
+            <Button
+                android:id="@+id/btnStartUpscale"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="UPSCALE 4X"
+                android:enabled="false" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnSaveUpscaledImage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="SAVE IMAGE"
+            android:enabled="false" />
+
+        <ProgressBar
+            android:id="@+id/upscaleProgressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:max="100"
+            android:progress="0"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/upscaleProgressLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Idle"
+            android:textColor="@android:color/black"
+            android:layout_marginTop="8dp" />
+
+        <ImageView
+            android:id="@+id/upscalePreview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:adjustViewBounds="true"
+            android:background="@android:color/darker_gray"
+            android:contentDescription="Image preview"
+            android:scaleType="fitCenter"
+            android:minHeight="256dp" />
+
+    </LinearLayout>
+</ScrollView>

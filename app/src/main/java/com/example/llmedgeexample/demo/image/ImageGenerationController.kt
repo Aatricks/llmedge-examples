@@ -61,7 +61,10 @@ internal interface ImageGenerationRuntime {
 
     fun getLastGenerationMetrics(): GenerationMetrics?
 
-    suspend fun upscale(request: io.aatricks.llmedge.image.UpscaleRequest): Bitmap
+    suspend fun upscale(
+        request: io.aatricks.llmedge.image.UpscaleRequest,
+        onProgress: ((current: Int, total: Int) -> Unit)? = null
+    ): Bitmap
 }
 
 internal class EdgeImageGenerationRuntime(
@@ -78,8 +81,11 @@ internal class EdgeImageGenerationRuntime(
 
     override fun getLastGenerationMetrics(): GenerationMetrics? = edge.image.getLastGenerationMetrics()
 
-    override suspend fun upscale(request: io.aatricks.llmedge.image.UpscaleRequest): Bitmap =
-        edge.image.upscale(request)
+    override suspend fun upscale(
+        request: io.aatricks.llmedge.image.UpscaleRequest,
+        onProgress: ((current: Int, total: Int) -> Unit)?
+    ): Bitmap =
+        edge.image.upscale(request, onProgress)
 }
 
 internal class ImageGenerationController(
@@ -250,11 +256,18 @@ internal class ImageGenerationController(
                         callbacks.onProgress(0, "Upscaling 4x...")
                     }
 
+                    val estimator = StepEtaEstimator(unitLabel = "Tile")
                     val result = runtime.upscale(
                         io.aatricks.llmedge.image.UpscaleRequest(
                             input = bitmap,
                             model = ModelSpec.localFile(downloadedFile)
-                        )
+                        ),
+                        onProgress = { current, total ->
+                            val snap = estimator.onStep(current, total)
+                            scope.launch(mainDispatcher) {
+                                callbacks.onProgress(snap.percent, snap.label)
+                            }
+                        }
                     )
 
                     logInfo("Image upscale completed: requestId=$requestId")

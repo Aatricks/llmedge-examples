@@ -178,7 +178,18 @@ class ImageGenerationControllerTest {
 
         waitUntil { callbacks.finishedCount == 1 }
 
-        assertEquals(listOf("Downloading upscaler...", "Upscaling 4x...", "Upscale complete"), callbacks.progressMessages)
+        assertTrue(callbacks.progressMessages.contains("Downloading upscaler..."))
+        assertTrue(callbacks.progressMessages.contains("Upscaling 4x..."))
+        assertTrue(callbacks.progressMessages.contains("Upscale complete"))
+
+        val tilePercents = callbacks.progressPercents.filter { it >= 1 }
+        assertTrue("Expected at least one progress percent >= 1", tilePercents.isNotEmpty())
+        for (i in 0 until tilePercents.size - 1) {
+            assertTrue("Expected monotonic percents, got $tilePercents", tilePercents[i] <= tilePercents[i + 1])
+        }
+        val tileMessages = callbacks.progressMessages.filter { it.contains("Tile") }
+        assertTrue("Expected progress message containing 'Tile'", tileMessages.isNotEmpty())
+
         assertNotNull(callbacks.upscaled)
         assertEquals(40, callbacks.upscaled!!.width)
         assertEquals(40, callbacks.upscaled!!.height)
@@ -283,7 +294,15 @@ class ImageGenerationControllerTest {
 
         override fun getLastGenerationMetrics(): GenerationMetrics? = metrics
 
-        override suspend fun upscale(request: io.aatricks.llmedge.image.UpscaleRequest): Bitmap {
+        override suspend fun upscale(
+            request: io.aatricks.llmedge.image.UpscaleRequest,
+            onProgress: ((current: Int, total: Int) -> Unit)?
+        ): Bitmap {
+            onProgress?.let {
+                for (i in 1..4) {
+                    it.invoke(i, 4)
+                }
+            }
             return Bitmap.createBitmap(request.input.width * 4, request.input.height * 4, Bitmap.Config.ARGB_8888)
         }
 

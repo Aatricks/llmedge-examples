@@ -3,7 +3,8 @@ package com.example.llmedgeexample.common
 import android.os.SystemClock
 
 class StepEtaEstimator(
-    private val clock: () -> Long = { SystemClock.elapsedRealtime() }
+    private val clock: () -> Long = { SystemClock.elapsedRealtime() },
+    private val unitLabel: String = "Step"
 ) {
     data class Snapshot(val percent: Int, val label: String)
 
@@ -30,11 +31,11 @@ class StepEtaEstimator(
 
         val percent = if (total > 0) (current * 100 / total).coerceIn(1, 100) else 1
         val label = if (deltas.isEmpty()) {
-            "Step $current/$total"
+            "$unitLabel $current/$total"
         } else {
             val mean = deltas.average().toLong()
             val remainingMs = mean * (total - current)
-            "Step $current/$total · ~${formatSeconds(remainingMs)} left"
+            "$unitLabel $current/$total · ~${formatSeconds(remainingMs)} left"
         }
 
         return Snapshot(percent, label)

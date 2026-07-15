@@ -92,7 +92,7 @@ class StepEtaEstimatorTest {
 
     @Test
     fun `percent is clamped between 1 and 100`() {
-        val estimator = StepEtaEstimator { 0L }
+        val estimator = StepEtaEstimator(clock = { 0L })
 
         // 0% gets clamped to 1%
         val snap0 = estimator.onStep(0, 100)

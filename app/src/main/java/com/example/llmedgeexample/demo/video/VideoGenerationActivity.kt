@@ -164,15 +164,29 @@ class VideoGenerationActivity : AppCompatActivity() {
                 views.progressBar.isIndeterminate = true
 
                 val gifFile = VideoGenerationMediaSupport.saveFramesAsGif(generatedFrames, fps)
+                val uri = saveFileToGallery(
+                    context = this@VideoGenerationActivity,
+                    file = gifFile,
+                    mimeType = "image/gif",
+                    relativePath = "Pictures/LLMEdge",
+                    displayName = gifFile.name
+                )
 
                 views.progressBar.visibility = View.GONE
-                Toast.makeText(
-                    applicationContext,
-                    "Saved GIF to: ${gifFile.absolutePath}",
-                    Toast.LENGTH_LONG,
-                ).show()
-
-                FileLogger.i(TAG, "GIF saved to: ${gifFile.absolutePath}")
+                if (uri != null) {
+                    Toast.makeText(
+                        applicationContext,
+                        "Saved GIF to Gallery: $uri",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                    FileLogger.i(TAG, "GIF saved to Gallery: $uri")
+                } else {
+                    Toast.makeText(
+                        applicationContext,
+                        "Failed to save GIF to gallery",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
             } catch (e: Exception) {
                 FileLogger.e(TAG, "Failed to save frames", e)
                 views.progressBar.visibility = View.GONE

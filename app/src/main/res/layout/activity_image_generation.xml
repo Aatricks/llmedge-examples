@@ -169,13 +169,29 @@
                 android:text="Cancel" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/btnUpscaleImage"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Upscale 4x"
-            android:enabled="false" />
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <Button
+                android:id="@+id/btnUpscaleImage"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Upscale 4x"
+                android:enabled="false" />
+
+            <Button
+                android:id="@+id/btnSaveImage"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Save Image"
+                android:enabled="false" />
+        </LinearLayout>
 
         <ProgressBar
             android:id="@+id/videoProgressBar"

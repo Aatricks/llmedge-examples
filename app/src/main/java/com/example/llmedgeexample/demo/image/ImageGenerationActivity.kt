@@ -69,6 +69,7 @@ class ImageGenerationActivity : AppCompatActivity() {
         views.upscaleButton.setOnClickListener {
             val bitmap = lastBitmap ?: return@setOnClickListener
             views.upscaleButton.isEnabled = false
+            views.saveImageButton.isEnabled = false
             controller.startUpscale(
                 bitmap = bitmap,
                 edge = edge,
@@ -79,21 +80,36 @@ class ImageGenerationActivity : AppCompatActivity() {
                         lastBitmap = upscaledBitmap
                         views.previewImage.setImageBitmap(upscaledBitmap)
                         views.upscaleButton.isEnabled = true
+                        views.saveImageButton.isEnabled = true
                     },
                     onCancelled = { requestId, reason, phase ->
                         android.util.Log.i(TAG, "Image upscale cancelled: requestId=$requestId, reason=${reason.logLabel}")
                         if (!isDestroyed) {
                             updateProgressUI(0, "Cancelled: ${reason.statusLabel}")
                             views.upscaleButton.isEnabled = true
+                            views.saveImageButton.isEnabled = lastBitmap != null
                         }
                     },
                     onFinished = {
                         views.progressBar.visibility = View.GONE
                         views.generateButton.isEnabled = true
                         views.upscaleButton.isEnabled = lastBitmap != null
+                        views.saveImageButton.isEnabled = lastBitmap != null
                     }
                 )
             )
+        }
+
+        views.saveImageButton.setOnClickListener {
+            val bitmap = lastBitmap ?: return@setOnClickListener
+            lifecycleScope.launch {
+                val uri = saveBitmapToGallery(this@ImageGenerationActivity, bitmap, "image_${System.currentTimeMillis()}.png")
+                if (uri != null) {
+                    Toast.makeText(this@ImageGenerationActivity, "Saved to Gallery: $uri", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this@ImageGenerationActivity, "Failed to save image", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         views.loraToggle.setOnCheckedChangeListener { _, isChecked ->
@@ -161,6 +177,7 @@ class ImageGenerationActivity : AppCompatActivity() {
         views.progressBar.isIndeterminate = true
         views.generateButton.isEnabled = false
         views.upscaleButton.isEnabled = false
+        views.saveImageButton.isEnabled = false
         val prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
         val preset = selectedPreset()
         val loraRequested = views.loraToggle.isChecked && preset.supportsLora
@@ -226,6 +243,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                                     lastBitmap = result.bitmap
                                     views.previewImage.setImageBitmap(result.bitmap)
                                     views.upscaleButton.isEnabled = true
+                                    views.saveImageButton.isEnabled = true
                                     result.metrics?.imageRequestMetrics?.let { imageMetrics ->
                                         android.util.Log.i(
                                             TAG,
