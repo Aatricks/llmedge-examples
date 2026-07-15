@@ -74,7 +74,7 @@ fun Context.buildDemoMemorySummary(cpuOnlyOverride: Boolean): String {
             appendLine("Vulkan mem: ${vulkanInfo.freeMemoryMB}MB / ${vulkanInfo.totalMemoryMB}MB")
         }
         if (isLowRamDevice()) {
-            appendLine("Note: Low RAM device - sequential loading enabled")
+            appendLine("Note: Low RAM device - video loading uses automatic memory planning")
         }
     }.trim()
 }

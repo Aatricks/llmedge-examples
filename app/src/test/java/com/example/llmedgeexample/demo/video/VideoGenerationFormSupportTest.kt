@@ -33,14 +33,26 @@ class VideoGenerationFormSupportTest {
     }
 
     @Test
-    fun `model presets default to Wan 2_1 and include Wan 2_2 Q6`() {
+    fun `model presets default to mobile Wan 2_1 and retain fp16 and Wan 2_2`() {
         val presets = VideoGenerationFormSupport.modelPresets
 
-        assertEquals("Wan 2.1 T2V 1.3B (default)", presets.first().displayName)
-        assertNull(presets.first().model)
-        assertNull(presets.first().vae)
+        assertEquals("Wan 2.1 T2V 1.3B Q3_K_S (mobile default)", presets.first().displayName)
+        val mobileModel = presets.first().model as? ModelSpec.HuggingFace
+        val mobileVae = presets.first().vae as? ModelSpec.HuggingFace
+        val mobileEncoder = presets.first().textEncoder as? ModelSpec.HuggingFace
+        assertEquals("samuelchristlie/Wan2.1-T2V-1.3B-GGUF", mobileModel?.repoId)
+        assertEquals("Wan2.1-T2V-1.3B-Q3_K_S.gguf", mobileModel?.filename)
+        assertEquals("Comfy-Org/Wan_2.1_ComfyUI_repackaged", mobileVae?.repoId)
+        assertEquals("wan_2.1_vae.safetensors", mobileVae?.filename)
+        assertEquals("city96/umt5-xxl-encoder-gguf", mobileEncoder?.repoId)
+        assertEquals("umt5-xxl-encoder-Q3_K_S.gguf", mobileEncoder?.filename)
 
-        val wan22 = presets[1]
+        val fp16 = presets[1]
+        assertEquals("Wan 2.1 T2V 1.3B fp16 (high memory)", fp16.displayName)
+        assertEquals("wan2.1_t2v_1.3B_fp16.safetensors", (fp16.model as? ModelSpec.HuggingFace)?.filename)
+        assertEquals("umt5-xxl-encoder-Q3_K_S.gguf", (fp16.textEncoder as? ModelSpec.HuggingFace)?.filename)
+
+        val wan22 = presets[2]
         assertEquals("Wan 2.2 TI2V 5B Q6_K", wan22.displayName)
         val model = wan22.model as? ModelSpec.HuggingFace
         val vae = wan22.vae as? ModelSpec.HuggingFace

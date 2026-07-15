@@ -67,10 +67,8 @@ class VideoGenerationController(
     fun start(config: VideoGenerationConfig, callbacks: VideoGenerationCallbacks) {
         check(!isGenerating()) { "Video generation already running" }
 
-        val isLowMemoryDevice = context.isLowRamDevice()
         val availableMemoryMb = context.availableMemoryMb()
         val actualFrames = (config.frames - 1) / 4 * 4 + 1
-        val useSequentialLoad = isLowMemoryDevice || availableMemoryMb < 2500L
 
         FileLogger.separator("Video Generation Starting")
         FileLogger.i(tag, "Parameters:")
@@ -85,7 +83,7 @@ class VideoGenerationController(
         FileLogger.i(tag, "  I2V: ${config.initImage != null}, Strength: ${config.initImageStrength}")
         FileLogger.i(
             tag,
-            "  Memory: isLowMem=$isLowMemoryDevice, available=${availableMemoryMb}MB",
+            "  Memory: available=${availableMemoryMb}MB, loading=automatic",
         )
 
         generationJob =
@@ -107,7 +105,7 @@ class VideoGenerationController(
                     FileLogger.i(tag, "Init image ready: ${resizedInitImage != null}")
                     FileLogger.i(
                         tag,
-                        "Generation mode: ${if (useSequentialLoad) "sequential" else "direct"} (isLowMem=$isLowMemoryDevice, available=${availableMemoryMb}MB)",
+                        "Generation mode: automatic (available=${availableMemoryMb}MB)",
                     )
 
                     withContext(Dispatchers.Main) {
@@ -128,7 +126,7 @@ class VideoGenerationController(
                             vae = config.vae,
                             textEncoder = config.textEncoder,
                             flashAttention = true,
-                            forceSequentialLoad = useSequentialLoad,
+                            forceSequentialLoad = false,
                             sampleMethod = config.sampleMethod,
                             scheduler = config.scheduler,
                             loraModelDir = config.loraDirectory ?: config.defaultLoraDirectory,
