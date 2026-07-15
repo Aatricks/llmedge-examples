@@ -19,6 +19,7 @@ internal enum class ImageModelPreset(
     SD3_MEDIUM(512, 512, 28, 4.5f, false),
     MINI_T2I(512, 512, 100, 6.0f, false),
     MINI_T2I_LARGE(512, 512, 100, 6.0f, false),
+    CHROMA_MOBILE(512, 512, 20, 4.0f, false),
     CHROMA_RADIANCE(512, 512, 20, 4.0f, false);
 
     fun buildRequest(
@@ -71,6 +72,15 @@ internal enum class ImageModelPreset(
                 flashAttention = flashAttention,
             )
             MINI_T2I_LARGE -> MiniT2I.largeImageRequest(
+                prompt = prompt,
+                width = width,
+                height = height,
+                steps = steps,
+                cfgScale = cfg,
+                seed = seed,
+                flashAttention = flashAttention,
+            )
+            CHROMA_MOBILE -> ChromaRadiance.mobileImageRequest(
                 prompt = prompt,
                 width = width,
                 height = height,

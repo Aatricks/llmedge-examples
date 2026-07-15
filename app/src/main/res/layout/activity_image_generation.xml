@@ -152,10 +152,16 @@
                 android:text="MiniT2I L/16 — FLAN-T5 Large (512×512, 100 steps, CFG 6)" />
 
             <RadioButton
+                android:id="@+id/presetChromaMobile"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Chroma1-HD Q3_K_S — mobile, sequential (~6.4GB download)" />
+
+            <RadioButton
                 android:id="@+id/presetChromaRadiance"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Chroma Radiance — split DiT + T5XXL (512×512, 20 steps, CFG 4)" />
+                android:text="Chroma Radiance Q4_K_S — high memory, sequential (~7.9GB download)" />
         </RadioGroup>
 
         <LinearLayout
