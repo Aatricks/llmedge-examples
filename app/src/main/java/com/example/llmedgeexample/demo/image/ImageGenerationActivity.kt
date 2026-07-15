@@ -98,6 +98,7 @@ class ImageGenerationActivity : AppCompatActivity() {
             R.id.presetSd3Medium -> ImageModelPreset.SD3_MEDIUM
             R.id.presetMiniT2i -> ImageModelPreset.MINI_T2I
             R.id.presetMiniT2iLarge -> ImageModelPreset.MINI_T2I_LARGE
+            R.id.presetChromaMobile -> ImageModelPreset.CHROMA_MOBILE
             R.id.presetChromaRadiance -> ImageModelPreset.CHROMA_RADIANCE
             else -> ImageModelPreset.SD15
         }
