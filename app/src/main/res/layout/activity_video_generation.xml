@@ -35,6 +35,17 @@
             android:background="@android:drawable/edit_text"
             android:padding="12dp" />
 
+        <EditText
+            android:id="@+id/videoNegativePromptInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:hint="Negative prompt (optional)"
+            android:minLines="2"
+            android:gravity="top"
+            android:background="@android:drawable/edit_text"
+            android:padding="12dp" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

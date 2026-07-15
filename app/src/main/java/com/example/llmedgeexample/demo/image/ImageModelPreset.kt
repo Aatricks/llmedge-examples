@@ -30,8 +30,9 @@ internal enum class ImageModelPreset(
         cfg: Float,
         seed: Long,
         flashAttention: Boolean,
+        negative: String = "",
     ): ImageGenerationRequest {
-        return when (this) {
+        val request = when (this) {
             SD15 -> ImageGenerationRequest(
                 prompt = prompt,
                 width = width,
@@ -99,5 +100,6 @@ internal enum class ImageModelPreset(
                 flashAttention = flashAttention,
             )
         }
+        return request.copy(negative = negative)
     }
 }

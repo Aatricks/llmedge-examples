@@ -12,6 +12,7 @@ import com.example.llmedgeexample.R
 
 internal data class VideoGenerationViews(
     val promptInput: EditText,
+    val negativePromptInput: EditText,
     val widthInput: EditText,
     val heightInput: EditText,
     val framesInput: EditText,
@@ -49,6 +50,7 @@ internal data class VideoGenerationViews(
         fun bind(activity: Activity): VideoGenerationViews =
             VideoGenerationViews(
                 promptInput = activity.findViewById(R.id.videoPromptInput),
+                negativePromptInput = activity.findViewById(R.id.videoNegativePromptInput),
                 widthInput = activity.findViewById(R.id.videoWidthInput),
                 heightInput = activity.findViewById(R.id.videoHeightInput),
                 framesInput = activity.findViewById(R.id.videoFramesInput),

@@ -133,6 +133,7 @@ class ImageGenerationActivity : AppCompatActivity() {
         views.progressBar.isIndeterminate = true
         views.generateButton.isEnabled = false
         val prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
+        val negative = views.negativePromptInput.text.toString().trim()
         val preset = selectedPreset()
         val loraRequested = views.loraToggle.isChecked && preset.supportsLora
 
@@ -140,6 +141,7 @@ class ImageGenerationActivity : AppCompatActivity() {
         val baseRequest =
             preset.buildRequest(
                 prompt = prompt,
+                negative = negative,
                 width = width,
                 height = height,
                 steps = steps,
