@@ -3,6 +3,7 @@ package com.example.llmedgeexample.demo.image
 import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
 import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -51,6 +52,7 @@ class ImageGenerationActivity : AppCompatActivity() {
     }
     private val requestPreparer by lazy(LazyThreadSafetyMode.NONE) { ImageGenerationRequestPreparer() }
     private var requestPreparationJob: Job? = null
+    private var lastBitmap: Bitmap? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,6 +66,51 @@ class ImageGenerationActivity : AppCompatActivity() {
 
         views.generateButton.setOnClickListener { startGeneration() }
         views.cancelButton.setOnClickListener { cancelGeneration() }
+        views.upscaleButton.setOnClickListener {
+            val bitmap = lastBitmap ?: return@setOnClickListener
+            views.upscaleButton.isEnabled = false
+            views.saveImageButton.isEnabled = false
+            controller.startUpscale(
+                bitmap = bitmap,
+                edge = edge,
+                callbacks = ImageGenerationCallbacks(
+                    onProgress = ::updateProgressUI,
+                    onCompleted = { },
+                    onUpscaled = { upscaledBitmap ->
+                        lastBitmap = upscaledBitmap
+                        views.previewImage.setImageBitmap(upscaledBitmap)
+                        views.upscaleButton.isEnabled = true
+                        views.saveImageButton.isEnabled = true
+                    },
+                    onCancelled = { requestId, reason, phase ->
+                        android.util.Log.i(TAG, "Image upscale cancelled: requestId=$requestId, reason=${reason.logLabel}")
+                        if (!isDestroyed) {
+                            updateProgressUI(0, "Cancelled: ${reason.statusLabel}")
+                            views.upscaleButton.isEnabled = true
+                            views.saveImageButton.isEnabled = lastBitmap != null
+                        }
+                    },
+                    onFinished = {
+                        views.progressBar.visibility = View.GONE
+                        views.generateButton.isEnabled = true
+                        views.upscaleButton.isEnabled = lastBitmap != null
+                        views.saveImageButton.isEnabled = lastBitmap != null
+                    }
+                )
+            )
+        }
+
+        views.saveImageButton.setOnClickListener {
+            val bitmap = lastBitmap ?: return@setOnClickListener
+            lifecycleScope.launch {
+                val uri = saveBitmapToGallery(this@ImageGenerationActivity, bitmap, "image_${System.currentTimeMillis()}.png")
+                if (uri != null) {
+                    Toast.makeText(this@ImageGenerationActivity, "Saved to Gallery: $uri", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this@ImageGenerationActivity, "Failed to save image", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
 
         views.loraToggle.setOnCheckedChangeListener { _, isChecked ->
             // Optionally, provide feedback to the user or log the state change
@@ -132,6 +179,8 @@ class ImageGenerationActivity : AppCompatActivity() {
         views.progressBar.visibility = View.VISIBLE
         views.progressBar.isIndeterminate = true
         views.generateButton.isEnabled = false
+        views.upscaleButton.isEnabled = false
+        views.saveImageButton.isEnabled = false
         val prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
         val negative = views.negativePromptInput.text.toString().trim()
         val preset = selectedPreset()
@@ -197,7 +246,10 @@ class ImageGenerationActivity : AppCompatActivity() {
                                 onProgress = ::updateProgressUI,
                                 onCompleted = { result ->
                                     logDemoMemoryState(TAG, "After image generation", includeGpu = true) { FileLogger.i(TAG, it) }
+                                    lastBitmap = result.bitmap
                                     views.previewImage.setImageBitmap(result.bitmap)
+                                    views.upscaleButton.isEnabled = true
+                                    views.saveImageButton.isEnabled = true
                                     result.metrics?.imageRequestMetrics?.let { imageMetrics ->
                                         android.util.Log.i(
                                             TAG,
@@ -212,6 +264,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                                     views.metricsLabel.visibility = View.VISIBLE
                                     updateProgressUI(100, "Complete. $metricsText")
                                 },
+                                onUpscaled = {},
                                 onCancelled = { requestId, reason, phase ->
                                     android.util.Log.i(
                                         TAG,

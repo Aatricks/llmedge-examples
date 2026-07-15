@@ -145,18 +145,20 @@ class VideoGenerationController(
                                 ),
                         )
 
+                    val estimator = StepEtaEstimator()
                     var frames: List<Bitmap> = emptyList()
                     edge.image.generateVideo(request).collect { event ->
                         when (event) {
                             is GenerationStreamEvent.Progress -> {
-                                val status =
-                                    if (event.update.total > 0) {
-                                        "${event.update.message} (${event.update.current}/${event.update.total})"
-                                    } else {
-                                        event.update.message
+                                if (event.update.total > 0) {
+                                    val snap = estimator.onStep(event.update.current, event.update.total)
+                                    withContext(Dispatchers.Main) {
+                                        callbacks.onProgress(snap.percent, "${event.update.message} · ${snap.label}")
                                     }
-                                withContext(Dispatchers.Main) {
-                                    callbacks.onProgress(0, status)
+                                } else {
+                                    withContext(Dispatchers.Main) {
+                                        callbacks.onProgress(0, event.update.message)
+                                    }
                                 }
                             }
                             is GenerationStreamEvent.Completed -> {

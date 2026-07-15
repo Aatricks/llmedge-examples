@@ -50,6 +50,10 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
+            android:name=".demo.upscale.ImageUpscaleActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".demo.tools.ToolCallingDemoActivity"
             android:exported="false" />
         <activity

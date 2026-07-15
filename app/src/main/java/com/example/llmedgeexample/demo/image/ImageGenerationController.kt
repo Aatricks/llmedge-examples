@@ -2,9 +2,12 @@ package com.example.llmedgeexample.demo.image
 
 import android.graphics.Bitmap
 import com.example.llmedgeexample.common.FileLogger
+import com.example.llmedgeexample.common.StepEtaEstimator
 import io.aatricks.llmedge.LLMEdge
+import io.aatricks.llmedge.image.GenerationStreamEvent
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.GenerationMetrics
+import io.aatricks.llmedge.model.ModelSpec
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -12,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -39,6 +43,7 @@ internal data class ImageGenerationResult(
 internal data class ImageGenerationCallbacks(
     val onProgress: (percent: Int, status: String) -> Unit,
     val onCompleted: (ImageGenerationResult) -> Unit,
+    val onUpscaled: (Bitmap) -> Unit,
     val onCancelled: (
         requestId: Long,
         reason: ImageGenerationCancellationReason,
@@ -50,9 +55,16 @@ internal data class ImageGenerationCallbacks(
 internal interface ImageGenerationRuntime {
     suspend fun generate(request: ImageGenerationRequest): Bitmap
 
+    fun generateStream(request: ImageGenerationRequest): Flow<GenerationStreamEvent>
+
     fun cancelGeneration()
 
     fun getLastGenerationMetrics(): GenerationMetrics?
+
+    suspend fun upscale(
+        request: io.aatricks.llmedge.image.UpscaleRequest,
+        onProgress: ((current: Int, total: Int) -> Unit)? = null
+    ): Bitmap
 }
 
 internal class EdgeImageGenerationRuntime(
@@ -60,11 +72,20 @@ internal class EdgeImageGenerationRuntime(
 ) : ImageGenerationRuntime {
     override suspend fun generate(request: ImageGenerationRequest): Bitmap = edge.image.generate(request)
 
+    override fun generateStream(request: ImageGenerationRequest): Flow<GenerationStreamEvent> =
+        edge.image.generateStream(request)
+
     override fun cancelGeneration() {
         edge.image.cancelGeneration()
     }
 
     override fun getLastGenerationMetrics(): GenerationMetrics? = edge.image.getLastGenerationMetrics()
+
+    override suspend fun upscale(
+        request: io.aatricks.llmedge.image.UpscaleRequest,
+        onProgress: ((current: Int, total: Int) -> Unit)?
+    ): Bitmap =
+        edge.image.upscale(request, onProgress)
 }
 
 internal class ImageGenerationController(
@@ -116,7 +137,22 @@ internal class ImageGenerationController(
                         callbacks.onProgress(0, "Generating image...")
                     }
 
-                    val bitmap = runtime.generate(config.request)
+                    val estimator = StepEtaEstimator()
+                    var bitmap: Bitmap? = null
+                    runtime.generateStream(config.request).collect { event ->
+                        when (event) {
+                            is GenerationStreamEvent.Progress -> {
+                                val snap = estimator.onStep(event.update.current, event.update.total)
+                                withContext(mainDispatcher) {
+                                    callbacks.onProgress(snap.percent, snap.label)
+                                }
+                            }
+                            is GenerationStreamEvent.Completed -> {
+                                bitmap = event.frames.first()
+                            }
+                        }
+                    }
+                    val finalBitmap = bitmap ?: throw IllegalStateException("Stream completed without a bitmap")
                     val metrics = runtime.getLastGenerationMetrics()
                     logInfo(
                         "Image request completed: requestId=$requestId, phase=$currentPhaseText, metricsAvailable=${metrics != null}",
@@ -126,7 +162,7 @@ internal class ImageGenerationController(
                         callbacks.onCompleted(
                             ImageGenerationResult(
                                 requestId = requestId,
-                                bitmap = bitmap,
+                                bitmap = finalBitmap,
                                 metrics = metrics,
                             ),
                         )
@@ -181,6 +217,96 @@ internal class ImageGenerationController(
             logInfo(
                 "Image request job completion observed: requestId=$requestId, phase=$currentPhaseText, result=$causeLabel",
             )
+        }
+    }
+
+    fun startUpscale(
+        bitmap: Bitmap,
+        callbacks: ImageGenerationCallbacks,
+        downloader: UpscalerAssetDownloader = RemacriUpscalerDownloader,
+        edge: LLMEdge,
+    ) {
+        if (isGenerating()) return
+
+        val requestId = requestIds.incrementAndGet()
+        activeRequestId = requestId
+        cancellationReason = null
+        updatePhase("preparing upscale")
+
+        logInfo("Image upscale started: requestId=$requestId")
+
+        generationJob =
+            scope.launch(ioDispatcher) {
+                try {
+                    withContext(mainDispatcher) {
+                        callbacks.onProgress(0, "Downloading upscaler...")
+                    }
+
+                    val downloadedFile = downloader.download(edge) { downloaded, total ->
+                        if (total != null && total > 0L) {
+                            val percent = ((downloaded * 100L) / total).coerceIn(0L, 100L)
+                            scope.launch(mainDispatcher) {
+                                callbacks.onProgress(percent.toInt(), "Downloading upscaler... $percent%")
+                            }
+                        }
+                    }
+
+                    updatePhase("upscaling image")
+                    withContext(mainDispatcher) {
+                        callbacks.onProgress(0, "Upscaling 4x...")
+                    }
+
+                    val estimator = StepEtaEstimator(unitLabel = "Tile")
+                    val result = runtime.upscale(
+                        io.aatricks.llmedge.image.UpscaleRequest(
+                            input = bitmap,
+                            model = ModelSpec.localFile(downloadedFile)
+                        ),
+                        onProgress = { current, total ->
+                            val snap = estimator.onStep(current, total)
+                            scope.launch(mainDispatcher) {
+                                callbacks.onProgress(snap.percent, snap.label)
+                            }
+                        }
+                    )
+
+                    logInfo("Image upscale completed: requestId=$requestId")
+                    withContext(mainDispatcher) {
+                        callbacks.onUpscaled(result)
+                        callbacks.onProgress(100, "Upscale complete")
+                    }
+                } catch (_: CancellationException) {
+                    val reason = cancellationReason ?: ImageGenerationCancellationReason.USER_CANCEL
+                    val phase = currentPhaseText
+                    logInfo("Image upscale cancelled: requestId=$requestId, phase=$phase, reason=${reason.logLabel}")
+                    withContext(NonCancellable + mainDispatcher) {
+                        callbacks.onCancelled(requestId, reason, phase)
+                    }
+                } catch (t: Throwable) {
+                    cancellationReason = ImageGenerationCancellationReason.ERROR
+                    updatePhase("failed")
+                    logError("Image upscale failed: requestId=$requestId, phase=$currentPhaseText, message=${t.message}", t)
+                    withContext(NonCancellable + mainDispatcher) {
+                        callbacks.onProgress(0, "Upscale failed: ${t.localizedMessage}")
+                    }
+                } finally {
+                    activeRequestId = null
+                    updatePhase("idle")
+                    cancellationReason = null
+                    withContext(NonCancellable + mainDispatcher) {
+                        generationJob = null
+                        callbacks.onFinished()
+                    }
+                }
+            }
+        generationJob?.invokeOnCompletion { cause ->
+            val id = activeRequestId ?: requestId
+            val causeLabel = when (cause) {
+                null -> "completed"
+                is CancellationException -> "cancelled:${cause.message}"
+                else -> "failed:${cause.message}"
+            }
+            logInfo("Image upscale job completion observed: requestId=$id, phase=$currentPhaseText, result=$causeLabel")
         }
     }
 
