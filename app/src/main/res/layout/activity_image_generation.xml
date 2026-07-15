@@ -169,6 +169,14 @@
                 android:text="Cancel" />
         </LinearLayout>
 
+        <Button
+            android:id="@+id/btnUpscaleImage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Upscale 4x"
+            android:enabled="false" />
+
         <ProgressBar
             android:id="@+id/videoProgressBar"
             style="?android:attr/progressBarStyleHorizontal"

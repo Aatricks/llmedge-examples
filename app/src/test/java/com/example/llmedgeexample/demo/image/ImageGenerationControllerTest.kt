@@ -157,6 +157,67 @@ class ImageGenerationControllerTest {
         assertEquals(mockBitmap, callbacks.completed?.bitmap)
     }
 
+    @Test
+    fun `startUpscale drives progress and completes with 4x bitmap`() = runBlocking {
+        val runtime = FakeImageGenerationRuntime()
+        val controller = newController(runtime, this)
+        val callbacks = RecordingCallbacks()
+        val inputBitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888)
+
+        val fakeDownloader = UpscalerAssetDownloader { _, _ -> java.io.File.createTempFile("fake", ".safetensors") }
+        // Detached scope: attaching LLMEdge's supervisor to runBlocking would keep the test alive forever.
+        val fakeEdgeScope = CoroutineScope(Dispatchers.Default)
+        val fakeEdge = io.aatricks.llmedge.LLMEdge.create(androidx.test.core.app.ApplicationProvider.getApplicationContext(), fakeEdgeScope)
+
+        controller.startUpscale(
+            edge = fakeEdge,
+            bitmap = inputBitmap,
+            downloader = fakeDownloader,
+            callbacks = callbacks.asCallbacks()
+        )
+
+        waitUntil { callbacks.finishedCount == 1 }
+
+        assertEquals(listOf("Downloading upscaler...", "Upscaling 4x...", "Upscale complete"), callbacks.progressMessages)
+        assertNotNull(callbacks.upscaled)
+        assertEquals(40, callbacks.upscaled!!.width)
+        assertEquals(40, callbacks.upscaled!!.height)
+    }
+
+    @Test
+    fun `startUpscale while generation in flight does nothing`() = runBlocking {
+        val runtime = FakeImageGenerationRuntime()
+        val controller = newController(runtime, this)
+        val callbacks = RecordingCallbacks()
+
+        controller.start(
+            config = ImageGenerationConfig(request = ImageGenerationRequest(prompt = "test", width = 128, height = 128, steps = 20)),
+            callbacks = callbacks.asCallbacks(),
+        )
+
+        waitUntil { runtime.enteredGenerate }
+
+        // Detached scope: attaching LLMEdge's supervisor to runBlocking would keep the test alive forever.
+        val fakeEdgeScope = CoroutineScope(Dispatchers.Default)
+        val fakeEdge = io.aatricks.llmedge.LLMEdge.create(androidx.test.core.app.ApplicationProvider.getApplicationContext(), fakeEdgeScope)
+        val fakeDownloader = UpscalerAssetDownloader { _, _ -> java.io.File.createTempFile("fake", ".safetensors") }
+        val upscaleCallbacks = RecordingCallbacks()
+
+        controller.startUpscale(
+            edge = fakeEdge,
+            bitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888),
+            downloader = fakeDownloader,
+            callbacks = upscaleCallbacks.asCallbacks()
+        )
+
+        assertEquals(0, upscaleCallbacks.progressMessages.size)
+        assertNull(upscaleCallbacks.upscaled)
+
+        // Unblock the in-flight generation so runBlocking's children can complete.
+        runtime.complete(Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888))
+        waitUntil { callbacks.finishedCount == 1 }
+    }
+
     private fun newController(
         runtime: FakeImageGenerationRuntime,
         scope: CoroutineScope,
@@ -222,6 +283,10 @@ class ImageGenerationControllerTest {
 
         override fun getLastGenerationMetrics(): GenerationMetrics? = metrics
 
+        override suspend fun upscale(request: io.aatricks.llmedge.image.UpscaleRequest): Bitmap {
+            return Bitmap.createBitmap(request.input.width * 4, request.input.height * 4, Bitmap.Config.ARGB_8888)
+        }
+
         fun complete(bitmap: Bitmap) {
             result.complete(bitmap)
         }
@@ -231,6 +296,7 @@ class ImageGenerationControllerTest {
         val progressMessages = mutableListOf<String>()
         val progressPercents = mutableListOf<Int>()
         var completed: ImageGenerationResult? = null
+        var upscaled: Bitmap? = null
         var cancelledReason: ImageGenerationCancellationReason? = null
         var finishedCount: Int = 0
 
@@ -241,6 +307,7 @@ class ImageGenerationControllerTest {
                     progressMessages += status
                 },
                 onCompleted = { completed = it },
+                onUpscaled = { upscaled = it },
                 onCancelled = { _, reason, _ -> cancelledReason = reason },
                 onFinished = { finishedCount += 1 },
             )

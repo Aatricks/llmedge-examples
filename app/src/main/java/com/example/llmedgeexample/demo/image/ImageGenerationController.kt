@@ -7,6 +7,7 @@ import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.image.GenerationStreamEvent
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.GenerationMetrics
+import io.aatricks.llmedge.model.ModelSpec
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -42,6 +43,7 @@ internal data class ImageGenerationResult(
 internal data class ImageGenerationCallbacks(
     val onProgress: (percent: Int, status: String) -> Unit,
     val onCompleted: (ImageGenerationResult) -> Unit,
+    val onUpscaled: (Bitmap) -> Unit,
     val onCancelled: (
         requestId: Long,
         reason: ImageGenerationCancellationReason,
@@ -58,6 +60,8 @@ internal interface ImageGenerationRuntime {
     fun cancelGeneration()
 
     fun getLastGenerationMetrics(): GenerationMetrics?
+
+    suspend fun upscale(request: io.aatricks.llmedge.image.UpscaleRequest): Bitmap
 }
 
 internal class EdgeImageGenerationRuntime(
@@ -73,6 +77,9 @@ internal class EdgeImageGenerationRuntime(
     }
 
     override fun getLastGenerationMetrics(): GenerationMetrics? = edge.image.getLastGenerationMetrics()
+
+    override suspend fun upscale(request: io.aatricks.llmedge.image.UpscaleRequest): Bitmap =
+        edge.image.upscale(request)
 }
 
 internal class ImageGenerationController(
@@ -204,6 +211,89 @@ internal class ImageGenerationController(
             logInfo(
                 "Image request job completion observed: requestId=$requestId, phase=$currentPhaseText, result=$causeLabel",
             )
+        }
+    }
+
+    fun startUpscale(
+        bitmap: Bitmap,
+        callbacks: ImageGenerationCallbacks,
+        downloader: UpscalerAssetDownloader = RemacriUpscalerDownloader,
+        edge: LLMEdge,
+    ) {
+        if (isGenerating()) return
+
+        val requestId = requestIds.incrementAndGet()
+        activeRequestId = requestId
+        cancellationReason = null
+        updatePhase("preparing upscale")
+
+        logInfo("Image upscale started: requestId=$requestId")
+
+        generationJob =
+            scope.launch(ioDispatcher) {
+                try {
+                    withContext(mainDispatcher) {
+                        callbacks.onProgress(0, "Downloading upscaler...")
+                    }
+
+                    val downloadedFile = downloader.download(edge) { downloaded, total ->
+                        if (total != null && total > 0L) {
+                            val percent = ((downloaded * 100L) / total).coerceIn(0L, 100L)
+                            scope.launch(mainDispatcher) {
+                                callbacks.onProgress(percent.toInt(), "Downloading upscaler... $percent%")
+                            }
+                        }
+                    }
+
+                    updatePhase("upscaling image")
+                    withContext(mainDispatcher) {
+                        callbacks.onProgress(0, "Upscaling 4x...")
+                    }
+
+                    val result = runtime.upscale(
+                        io.aatricks.llmedge.image.UpscaleRequest(
+                            input = bitmap,
+                            model = ModelSpec.localFile(downloadedFile)
+                        )
+                    )
+
+                    logInfo("Image upscale completed: requestId=$requestId")
+                    withContext(mainDispatcher) {
+                        callbacks.onUpscaled(result)
+                        callbacks.onProgress(100, "Upscale complete")
+                    }
+                } catch (_: CancellationException) {
+                    val reason = cancellationReason ?: ImageGenerationCancellationReason.USER_CANCEL
+                    val phase = currentPhaseText
+                    logInfo("Image upscale cancelled: requestId=$requestId, phase=$phase, reason=${reason.logLabel}")
+                    withContext(NonCancellable + mainDispatcher) {
+                        callbacks.onCancelled(requestId, reason, phase)
+                    }
+                } catch (t: Throwable) {
+                    cancellationReason = ImageGenerationCancellationReason.ERROR
+                    updatePhase("failed")
+                    logError("Image upscale failed: requestId=$requestId, phase=$currentPhaseText, message=${t.message}", t)
+                    withContext(NonCancellable + mainDispatcher) {
+                        callbacks.onProgress(0, "Upscale failed: ${t.localizedMessage}")
+                    }
+                } finally {
+                    activeRequestId = null
+                    updatePhase("idle")
+                    cancellationReason = null
+                    withContext(NonCancellable + mainDispatcher) {
+                        generationJob = null
+                        callbacks.onFinished()
+                    }
+                }
+            }
+        generationJob?.invokeOnCompletion { cause ->
+            val id = activeRequestId ?: requestId
+            val causeLabel = when (cause) {
+                null -> "completed"
+                is CancellationException -> "cancelled:${cause.message}"
+                else -> "failed:${cause.message}"
+            }
+            logInfo("Image upscale job completion observed: requestId=$id, phase=$currentPhaseText, result=$causeLabel")
         }
     }
 

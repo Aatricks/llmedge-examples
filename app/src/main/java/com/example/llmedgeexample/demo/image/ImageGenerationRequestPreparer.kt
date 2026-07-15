@@ -112,3 +112,32 @@ private object DetailTweakerImageLoraDownloader : ImageLoraAssetDownloader {
             },
         )
 }
+
+internal fun interface UpscalerAssetDownloader {
+    suspend fun download(
+        edge: LLMEdge,
+        onProgress: (downloaded: Long, total: Long?) -> Unit,
+    ): File
+}
+
+internal object RemacriUpscalerDownloader : UpscalerAssetDownloader {
+    override suspend fun download(
+        edge: LLMEdge,
+        onProgress: (downloaded: Long, total: Long?) -> Unit,
+    ): File =
+        edge.models.resolve(
+            ModelSpec.huggingFace(
+                repoId = "LyliaEngine/4x_foolhardy_Remacri",
+                filename = "4x_foolhardy_Remacri.safetensors",
+                preferredQuantizations = emptyList(),
+                hints =
+                    ModelHints(
+                        artifactKind = ModelArtifactKind.REPO_FILE,
+                        capabilities = setOf(ModelCapability.IMAGE),
+                    ),
+            ),
+            onProgress = { progress ->
+                onProgress(progress.downloadedBytes, progress.totalBytes)
+            },
+        )
+}
