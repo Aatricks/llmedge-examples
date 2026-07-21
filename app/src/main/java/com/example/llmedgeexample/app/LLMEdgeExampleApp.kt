@@ -34,7 +34,11 @@ class LLMEdgeExampleApp : Application() {
         FileLogger.i(TAG, "Log file: ${FileLogger.getCurrentLogFile()}")
         
         logMemoryState("Application started")
-        
+
+        // onCreate also runs in the :llmedge_sd worker process; only the main
+        // process should kick off the GPU probe (which itself spawns that worker).
+        if (getProcessName() != packageName) return
+
         val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         appScope.launch {
             val gpuStatus = probeGpuBackendStatus(this@LLMEdgeExampleApp)
