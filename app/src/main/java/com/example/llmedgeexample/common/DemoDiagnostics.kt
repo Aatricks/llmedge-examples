@@ -46,7 +46,7 @@ fun Context.logDemoMemoryState(
     logger: (String) -> Unit = { message -> Log.i(tag, message) },
 ) {
     val snapshot = demoMemorySnapshot()
-    val gpuStatus = if (includeGpu) detectGpuBackendStatus() else null
+    val gpuStatus = if (includeGpu) detectGpuBackendStatus(this) else null
     logger("=== Memory: $phase ===")
     logger("  Heap: ${snapshot.heapUsedMb}MB / ${snapshot.heapMaxMb}MB max")
     logger("  System: ${snapshot.systemAvailableMb}MB / ${snapshot.systemTotalMb}MB total")
@@ -62,7 +62,7 @@ fun Context.logDemoMemoryState(
 
 fun Context.buildDemoMemorySummary(cpuOnlyOverride: Boolean): String {
     val snapshot = demoMemorySnapshot()
-    val gpuStatus = detectGpuBackendStatus()
+    val gpuStatus = detectGpuBackendStatus(this)
     return buildString {
         appendLine(
             "System: ${snapshot.systemUsedMb}MB / ${snapshot.systemTotalMb}MB (${snapshot.systemAvailableMb}MB free)"

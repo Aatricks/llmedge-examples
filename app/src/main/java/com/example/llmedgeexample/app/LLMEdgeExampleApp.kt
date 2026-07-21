@@ -2,6 +2,10 @@ package com.example.llmedgeexample.app
 
 import android.app.Application
 import com.example.llmedgeexample.common.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Application class for LLMEdge Example app.
@@ -31,18 +35,21 @@ class LLMEdgeExampleApp : Application() {
         
         logMemoryState("Application started")
         
-        val gpuStatus = detectGpuBackendStatus()
-        if (gpuStatus.openClAvailable || gpuStatus.vulkanAvailable) {
-            FileLogger.i(TAG, "GPU backends available: ${gpuStatus.summary()}")
-            gpuStatus.vulkanInfo?.let { vulkanInfo ->
-                FileLogger.i(
-                    TAG,
-                    "Vulkan available: ${vulkanInfo.deviceCount} device(s), " +
-                        "${vulkanInfo.freeMemoryMB}MB free / ${vulkanInfo.totalMemoryMB}MB total",
-                )
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        appScope.launch {
+            val gpuStatus = probeGpuBackendStatus(this@LLMEdgeExampleApp)
+            if (gpuStatus.openClAvailable || gpuStatus.vulkanAvailable) {
+                FileLogger.i(TAG, "GPU backends available: ${gpuStatus.summary()}")
+                gpuStatus.vulkanInfo?.let { vulkanInfo ->
+                    FileLogger.i(
+                        TAG,
+                        "Vulkan available: ${vulkanInfo.deviceCount} device(s), " +
+                            "${vulkanInfo.freeMemoryMB}MB free / ${vulkanInfo.totalMemoryMB}MB total",
+                    )
+                }
+            } else {
+                FileLogger.w(TAG, "GPU backends unavailable - CPU fallback only")
             }
-        } else {
-            FileLogger.w(TAG, "GPU backends unavailable - CPU fallback only")
         }
     }
 
@@ -76,7 +83,7 @@ class LLMEdgeExampleApp : Application() {
      */
     fun logMemoryState(phase: String) {
         val snapshot = demoMemorySnapshot()
-        logDemoMemoryState(TAG, phase, includeGpu = true) { FileLogger.i(TAG, it) }
+        logDemoMemoryState(TAG, phase, includeGpu = false) { FileLogger.i(TAG, it) }
         FileLogger.i(TAG, "  Heap free: ${snapshot.heapMaxMb - snapshot.heapUsedMb}MB")
     }
     
