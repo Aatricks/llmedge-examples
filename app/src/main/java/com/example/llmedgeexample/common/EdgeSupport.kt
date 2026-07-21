@@ -78,12 +78,26 @@ data class GpuBackendStatus(
         get() = image.vulkanDeviceInfo
 }
 
-fun detectGpuBackendStatus(): GpuBackendStatus =
+suspend fun probeGpuBackendStatus(context: Context): GpuBackendStatus {
+    if (isCpuOnlyForced(context)) {
+        val allFalse = ComputeBackendAvailability(false, false, null)
+        return GpuBackendStatus(allFalse, allFalse, allFalse, allFalse)
+    }
+    LLMEdge.probeImageBackendAvailability(context)
+    return GpuBackendStatus(
+        text = LLMEdge.getTextBackendAvailability(context),
+        speech = LLMEdge.getSpeechBackendAvailability(context),
+        image = LLMEdge.getImageBackendAvailability(context),
+        vision = LLMEdge.getVisionBackendAvailability(context),
+    )
+}
+
+fun detectGpuBackendStatus(context: Context): GpuBackendStatus =
     GpuBackendStatus(
-        text = LLMEdge.getTextBackendAvailability(),
-        speech = LLMEdge.getSpeechBackendAvailability(),
-        image = LLMEdge.getImageBackendAvailability(),
-        vision = LLMEdge.getVisionBackendAvailability(),
+        text = LLMEdge.getTextBackendAvailability(context),
+        speech = LLMEdge.getSpeechBackendAvailability(context),
+        image = LLMEdge.getImageBackendAvailability(context),
+        vision = LLMEdge.getVisionBackendAvailability(context),
     )
 
 fun GpuBackendStatus.summary(): String {
