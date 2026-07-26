@@ -70,6 +70,7 @@ internal class ImageGenerationRequestPreparer(
                                 ),
                             steps = if (isHyperSd3) 4 else baseRequest.steps,
                             cfgScale = if (isHyperSd3) 3.0f else baseRequest.cfgScale,
+                            sequential = if (isHyperSd3) true else baseRequest.sequential,
                             loraModelDir = loraDirectory,
                             loraApplyMode = LoraApplyMode.AUTO,
                         ),

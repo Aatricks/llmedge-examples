@@ -142,6 +142,7 @@ class ImageGenerationRequestPreparerTest {
         assertEquals(4, prepared.request.steps)
         assertEquals(3.0f, prepared.request.cfgScale)
         assertEquals(loraDirectory.absolutePath, prepared.request.loraModelDir)
+        assertEquals(true, prepared.request.sequential)
     }
 
     @Test(expected = CancellationException::class)

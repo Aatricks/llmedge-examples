@@ -192,12 +192,13 @@ class Issue31WanDeviceE2ETest {
                                 seed = 42L,
                                 flashAttention = true,
                                 easyCacheEnabled = false,
-                            ).copy(forceSequentialLoad = true),
+                            ),
                         loraRequested = false,
                         hyperSd3Requested = true,
                     )
                 }
 
+            assertEquals(true, prepared.request.sequential)
             val bitmap =
                 withTimeout(90 * 60_000L) {
                     edge.image.generate(prepared.request)
