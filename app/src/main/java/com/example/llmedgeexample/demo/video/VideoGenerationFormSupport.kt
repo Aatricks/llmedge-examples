@@ -155,6 +155,16 @@ internal object VideoGenerationFormSupport {
     fun selectedModelPreset(position: Int): VideoModelPreset =
         modelPresets.getOrElse(position) { modelPresets.first() }
 
+    fun withModelOverride(
+        preset: VideoModelPreset,
+        modelOverride: ModelSpec?,
+    ): VideoModelPreset =
+        if (modelOverride == null) {
+            preset
+        } else {
+            preset.copy(model = modelOverride)
+        }
+
     fun parseDimensionField(
         field: EditText,
         defaultValue: Int,

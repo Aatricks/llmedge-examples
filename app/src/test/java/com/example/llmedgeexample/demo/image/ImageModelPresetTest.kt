@@ -3,6 +3,7 @@ package com.example.llmedgeexample.demo.image
 import io.aatricks.llmedge.image.Flux2Klein
 import io.aatricks.llmedge.image.MiniT2I
 import io.aatricks.llmedge.image.Sd3Medium
+import io.aatricks.llmedge.model.ModelSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -225,5 +226,30 @@ class ImageModelPresetTest {
             flashAttention = true,
         )
         assertEquals("", request.negative)
+    }
+
+    @Test
+    fun `local gguf overrides only the selected preset model and easy cache can be disabled`() {
+        val localModel = ModelSpec.localFile("/models/sd3-finetune.gguf")
+
+        val request =
+            ImageModelPreset.SD3_MEDIUM.buildRequest(
+                prompt = "a small robot",
+                width = 512,
+                height = 512,
+                steps = 28,
+                cfg = 4.5f,
+                seed = 42L,
+                flashAttention = true,
+                modelOverride = localModel,
+                easyCacheEnabled = false,
+            )
+
+        assertEquals(localModel, request.model)
+        assertEquals(Sd3Medium.vae, request.vae)
+        assertEquals(Sd3Medium.clipL, request.clipL)
+        assertEquals(Sd3Medium.clipG, request.clipG)
+        assertEquals(Sd3Medium.t5xxl, request.t5xxl)
+        assertFalse(request.easyCache.enabled)
     }
 }

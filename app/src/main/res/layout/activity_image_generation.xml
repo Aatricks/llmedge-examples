@@ -124,6 +124,19 @@
             android:layout_marginTop="12dp"
             android:text="Use Detail Tweaker LoRA" />
 
+        <Switch
+            android:id="@+id/hyperSd3Toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:enabled="false"
+            android:text="Use Hyper-SD3 4-step LoRA (SD3 only)" />
+
+        <Switch
+            android:id="@+id/imageEasyCacheToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Enable EasyCache (faster, may reduce quality)" />
+
         <RadioGroup
             android:id="@+id/modelPresetGroup"
             android:layout_width="match_parent"
@@ -174,6 +187,53 @@
                 android:layout_height="wrap_content"
                 android:text="Chroma Radiance Q4_K_S — high memory, sequential (~7.9GB download)" />
         </RadioGroup>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Compatible local model override"
+            android:textColor="@android:color/black"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select a GGUF fine-tune compatible with the preset above. Its existing VAE and text encoders will be retained."
+            android:textColor="@android:color/darker_gray"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSelectImageModel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select GGUF" />
+
+            <TextView
+                android:id="@+id/imageModelLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="middle"
+                android:singleLine="true"
+                android:text="Use selected preset model"
+                android:textColor="@android:color/darker_gray" />
+
+            <Button
+                android:id="@+id/btnClearImageModel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Clear"
+                android:visibility="gone" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

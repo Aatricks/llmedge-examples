@@ -2,14 +2,18 @@ package com.example.llmedgeexample.demo.image
 
 import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import io.aatricks.llmedge.image.diffusion.GenerationMetrics
+import io.aatricks.llmedge.model.ModelSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -53,6 +57,14 @@ class ImageGenerationActivity : AppCompatActivity() {
     private val requestPreparer by lazy(LazyThreadSafetyMode.NONE) { ImageGenerationRequestPreparer() }
     private var requestPreparationJob: Job? = null
     private var lastBitmap: Bitmap? = null
+    private var selectedModelOverride: ModelSpec? = null
+
+    private val modelPickerLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                result.data?.data?.let(::loadImportedModel)
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +78,12 @@ class ImageGenerationActivity : AppCompatActivity() {
 
         views.generateButton.setOnClickListener { startGeneration() }
         views.cancelButton.setOnClickListener { cancelGeneration() }
+        views.selectModelButton.setOnClickListener {
+            modelPickerLauncher.launch(
+                ImportedModelSupport.createPickerIntent("Select compatible image model (.gguf)"),
+            )
+        }
+        views.clearModelButton.setOnClickListener { clearImportedModel() }
         views.upscaleButton.setOnClickListener {
             val bitmap = lastBitmap ?: return@setOnClickListener
             views.upscaleButton.isEnabled = false
@@ -113,11 +131,19 @@ class ImageGenerationActivity : AppCompatActivity() {
         }
 
         views.loraToggle.setOnCheckedChangeListener { _, isChecked ->
-            // Optionally, provide feedback to the user or log the state change
             if (isChecked) {
+                views.hyperSd3Toggle.isChecked = false
                 Toast.makeText(this, "Detail Tweaker LoRA Enabled", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this, "Detail Tweaker LoRA Disabled", Toast.LENGTH_SHORT).show()
+            }
+        }
+        views.hyperSd3Toggle.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                views.loraToggle.isChecked = false
+                views.stepsInput.setText("4")
+                views.cfgInput.setText("3.0")
+                Toast.makeText(this, "Hyper-SD3 enabled: 4 steps, CFG 3.0", Toast.LENGTH_SHORT).show()
             }
         }
         views.modelPresetGroup.setOnCheckedChangeListener { _, _ ->
@@ -130,6 +156,11 @@ class ImageGenerationActivity : AppCompatActivity() {
             if (!preset.supportsLora) {
                 views.loraToggle.isChecked = false
             }
+            views.hyperSd3Toggle.isEnabled = preset == ImageModelPreset.SD3_MEDIUM
+            if (preset != ImageModelPreset.SD3_MEDIUM) {
+                views.hyperSd3Toggle.isChecked = false
+            }
+            clearImportedModel()
         }
 
         views.shareLogsButton.setOnClickListener { shareLogs() }
@@ -149,6 +180,66 @@ class ImageGenerationActivity : AppCompatActivity() {
             R.id.presetChromaRadiance -> ImageModelPreset.CHROMA_RADIANCE
             else -> ImageModelPreset.SD15
         }
+    }
+
+    private fun loadImportedModel(uri: Uri) {
+        val previousModel = selectedModelOverride
+        val previousLabel = views.modelLabel.text
+        val internalNamePrefix =
+            when (selectedPreset()) {
+                ImageModelPreset.SD15 -> "stable-diffusion-"
+                ImageModelPreset.FLUX2_KLEIN_BONSAI -> "flux-"
+                ImageModelPreset.SD3_MEDIUM -> "sd3-"
+                ImageModelPreset.MINI_T2I,
+                ImageModelPreset.MINI_T2I_LARGE,
+                -> "minit2i-"
+                ImageModelPreset.CHROMA_MOBILE,
+                ImageModelPreset.CHROMA_RADIANCE,
+                -> "chroma-"
+            }
+        views.selectModelButton.isEnabled = false
+        views.generateButton.isEnabled = false
+        views.modelLabel.text = "Importing model..."
+        lifecycleScope.launch {
+            try {
+                val imported =
+                    withContext(Dispatchers.IO) {
+                        ImportedModelSupport.copyToAppStorage(
+                            context = this@ImageGenerationActivity,
+                            uri = uri,
+                            internalNamePrefix = internalNamePrefix,
+                        )
+                    }
+                selectedModelOverride = ModelSpec.localFile(imported.file)
+                views.modelLabel.text = imported.displayName
+                views.clearModelButton.visibility = View.VISIBLE
+                FileLogger.i(TAG, "Imported compatible image model: ${imported.file.absolutePath}")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                selectedModelOverride = previousModel
+                views.modelLabel.text = previousLabel
+                views.clearModelButton.visibility =
+                    if (previousModel == null) View.GONE else View.VISIBLE
+                FileLogger.e(TAG, "Failed to import image model", t)
+                Toast.makeText(
+                    this@ImageGenerationActivity,
+                    "Failed to import model: ${t.localizedMessage ?: "unknown error"}",
+                    Toast.LENGTH_LONG,
+                ).show()
+            } finally {
+                views.selectModelButton.isEnabled = true
+                if (!controller.isGenerating() && requestPreparationJob?.isActive != true) {
+                    views.generateButton.isEnabled = true
+                }
+            }
+        }
+    }
+
+    private fun clearImportedModel() {
+        selectedModelOverride = null
+        views.modelLabel.text = "Use selected preset model"
+        views.clearModelButton.visibility = View.GONE
     }
 
     private fun startGeneration() {
@@ -185,6 +276,9 @@ class ImageGenerationActivity : AppCompatActivity() {
         val negative = views.negativePromptInput.text.toString().trim()
         val preset = selectedPreset()
         val loraRequested = views.loraToggle.isChecked && preset.supportsLora
+        val hyperSd3Requested =
+            views.hyperSd3Toggle.isChecked && preset == ImageModelPreset.SD3_MEDIUM
+        val anyLoraRequested = loraRequested || hyperSd3Requested
 
         val useFlashAttn = width >= 512 && height >= 512
         val baseRequest =
@@ -197,6 +291,8 @@ class ImageGenerationActivity : AppCompatActivity() {
                 cfg = cfg,
                 seed = seed,
                 flashAttention = useFlashAttn,
+                modelOverride = selectedModelOverride,
+                easyCacheEnabled = views.easyCacheToggle.isChecked,
             )
 
         requestPreparationJob =
@@ -208,6 +304,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                                 edge = edge,
                                 baseRequest = baseRequest,
                                 loraRequested = loraRequested,
+                                hyperSd3Requested = hyperSd3Requested,
                                 onStatus = { status -> updateProgressUI(0, status) },
                             )
                         }
@@ -224,14 +321,14 @@ class ImageGenerationActivity : AppCompatActivity() {
                     val submitLog =
                         "Submitting image request: width=${prepared.request.width}, height=${prepared.request.height}, steps=${prepared.request.steps}, " +
                             "flash=${prepared.request.flashAttention}, easyCache=${prepared.request.easyCache.enabled}, " +
-                            "executionOverride=$executionOverride, nativeSequentialLoad=${prepared.request.forceSequentialLoad}, loraRequested=$loraRequested, " +
+                            "executionOverride=$executionOverride, nativeSequentialLoad=${prepared.request.forceSequentialLoad}, loraRequested=$anyLoraRequested, " +
                             "loraApplied=${prepared.loraApplied}, loraDir=${prepared.request.loraModelDir ?: "none"}"
                     FileLogger.i(TAG, submitLog)
                     android.util.Log.i(
                         TAG,
                         "Submitting image request: width=${prepared.request.width}, height=${prepared.request.height}, steps=${prepared.request.steps}, " +
                             "flash=${prepared.request.flashAttention}, easyCache=${prepared.request.easyCache.enabled}, " +
-                            "executionOverride=$executionOverride, nativeSequentialLoad=${prepared.request.forceSequentialLoad}, loraRequested=$loraRequested, " +
+                            "executionOverride=$executionOverride, nativeSequentialLoad=${prepared.request.forceSequentialLoad}, loraRequested=$anyLoraRequested, " +
                             "loraApplied=${prepared.loraApplied}, loraDir=${prepared.request.loraModelDir ?: "none"}",
                     )
 
@@ -239,7 +336,7 @@ class ImageGenerationActivity : AppCompatActivity() {
                         config =
                             ImageGenerationConfig(
                                 request = prepared.request,
-                                loraRequested = loraRequested,
+                                loraRequested = anyLoraRequested,
                             ),
                         callbacks =
                             ImageGenerationCallbacks(

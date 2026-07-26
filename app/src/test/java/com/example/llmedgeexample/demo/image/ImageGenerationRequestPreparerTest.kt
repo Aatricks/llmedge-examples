@@ -5,6 +5,7 @@ import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.image.ImageGenerationRequest
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -97,5 +98,72 @@ class ImageGenerationRequestPreparerTest {
             "Failed to download Detail Tweaker LoRA: network down. Continuing without LoRA.",
             prepared.warningMessage,
         )
+    }
+
+    @Test
+    fun `hyper sd3 option applies official four step settings and lora scale`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val edge = LLMEdge.create(context, this)
+        val loraDirectory = File(context.filesDir, "hyper-sd3").apply { mkdirs() }
+        val loraFile =
+            File(loraDirectory, "Hyper-SD3-4steps-CFG-lora.safetensors").apply {
+                writeText("stub")
+            }
+        val preparer =
+            ImageGenerationRequestPreparer(
+                loraDownloader = ImageLoraAssetDownloader { _, _ -> error("detail downloader should not be called") },
+                hyperSd3Downloader = ImageLoraAssetDownloader { _, _ -> loraFile },
+            )
+
+        val prepared =
+            try {
+                preparer.prepare(
+                    edge = edge,
+                    baseRequest =
+                        ImageGenerationRequest(
+                            prompt = "city skyline",
+                            width = 128,
+                            height = 128,
+                            steps = 28,
+                            cfgScale = 4.5f,
+                        ),
+                    loraRequested = false,
+                    hyperSd3Requested = true,
+                )
+            } finally {
+                edge.close()
+            }
+
+        assertTrue(prepared.loraApplied)
+        assertEquals(
+            "city skyline <lora:Hyper-SD3-4steps-CFG-lora:0.125>",
+            prepared.request.prompt,
+        )
+        assertEquals(4, prepared.request.steps)
+        assertEquals(3.0f, prepared.request.cfgScale)
+        assertEquals(loraDirectory.absolutePath, prepared.request.loraModelDir)
+    }
+
+    @Test(expected = CancellationException::class)
+    fun `lora download cancellation is rethrown`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val edge = LLMEdge.create(context, this)
+        val preparer =
+            ImageGenerationRequestPreparer(
+                loraDownloader =
+                    ImageLoraAssetDownloader { _, _ ->
+                        throw CancellationException("cancelled")
+                    },
+            )
+
+        try {
+            preparer.prepare(
+                edge = edge,
+                baseRequest = ImageGenerationRequest(prompt = "city skyline"),
+                loraRequested = true,
+            )
+        } finally {
+            edge.close()
+        }
     }
 }

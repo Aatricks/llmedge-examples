@@ -25,6 +25,60 @@
             android:contentDescription="Wan model"
             android:background="@android:drawable/btn_dropdown" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Compatible local Wan model override"
+            android:textColor="@android:color/black"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select a GGUF fine-tune compatible with the preset above. Its VAE and text encoder will be retained."
+            android:textColor="@android:color/darker_gray"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSelectVideoModel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select GGUF" />
+
+            <TextView
+                android:id="@+id/videoModelLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="middle"
+                android:singleLine="true"
+                android:text="Use selected preset model"
+                android:textColor="@android:color/darker_gray" />
+
+            <Button
+                android:id="@+id/btnClearVideoModel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Clear"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <Switch
+            android:id="@+id/videoEasyCacheToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="Enable EasyCache (faster, may reduce quality)" />
+
         <EditText
             android:id="@+id/videoPromptInput"
             android:layout_width="match_parent"
