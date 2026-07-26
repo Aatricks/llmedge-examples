@@ -9,9 +9,9 @@ import com.example.llmedgeexample.common.availableMemoryMb
 import com.example.llmedgeexample.common.getOpenableDisplayName
 import com.example.llmedgeexample.common.logDemoMemoryState
 import io.aatricks.llmedge.LLMEdge
-import io.aatricks.llmedge.rag.EmbeddingConfig
 import io.aatricks.llmedge.rag.RAGSession
 import io.aatricks.llmedge.rag.TextSplitter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -21,6 +21,7 @@ internal class RagController(
     private val scope: LifecycleCoroutineScope,
     private val edge: LLMEdge,
     private val views: RagViews,
+    private val embeddingProvisioner: MiniLmEmbeddingProvisioner = MiniLmEmbeddingProvisioner(),
 ) {
     companion object {
         private const val TAG = "RagActivity"
@@ -46,19 +47,21 @@ internal class RagController(
                 activity.logDemoMemoryState(TAG, "Before LLM load")
                 rag =
                     withContext(Dispatchers.IO) {
+                        val embeddingConfig =
+                            embeddingProvisioner.prepare(activity) { status ->
+                                activity.runOnUiThread {
+                                    views.statusView.text = status
+                                }
+                            }
                         edge.rag.createSession(
                             splitter = TextSplitter(chunkSize = 400, chunkOverlap = 80),
-                            embeddingConfig =
-                                EmbeddingConfig(
-                                    modelAssetPath = "embeddings/all-minilm-l6-v2/model.onnx",
-                                    tokenizerAssetPath = "embeddings/all-minilm-l6-v2/tokenizer.json",
-                                    useTokenTypeIds = false,
-                                    outputTensorName = "sentence_embedding",
-                                ),
+                            embeddingConfig = embeddingConfig,
                         ).also { it.init() }
                     }
                 activity.logDemoMemoryState(TAG, "After LLM and RAG init")
                 views.statusView.text = "LLM ready. Pick a PDF to index."
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (oom: OutOfMemoryError) {
                 android.util.Log.e(TAG, "OOM loading LLM", oom)
                 activity.logDemoMemoryState(TAG, "OOM error")
