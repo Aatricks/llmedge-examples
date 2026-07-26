@@ -64,4 +64,16 @@ class VideoGenerationFormSupportTest {
         assertEquals("VAE/Wan2.2_VAE.safetensors", vae?.filename)
         assertTrue(VideoGenerationFormSupport.selectedModelPreset(99) === presets.first())
     }
+
+    @Test
+    fun `local gguf overrides only the selected Wan model`() {
+        val preset = VideoGenerationFormSupport.modelPresets.first()
+        val localModel = ModelSpec.localFile("/models/wan-finetune.gguf")
+
+        val selected = VideoGenerationFormSupport.withModelOverride(preset, localModel)
+
+        assertEquals(localModel, selected.model)
+        assertEquals(preset.vae, selected.vae)
+        assertEquals(preset.textEncoder, selected.textEncoder)
+    }
 }

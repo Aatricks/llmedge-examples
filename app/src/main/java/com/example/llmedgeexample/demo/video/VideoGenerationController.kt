@@ -41,6 +41,7 @@ data class VideoGenerationConfig(
     val initImage: Bitmap?,
     val initImageStrength: Float,
     val defaultLoraDirectory: String?,
+    val easyCacheEnabled: Boolean = true,
 )
 
 data class VideoGenerationResult(
@@ -54,6 +55,40 @@ data class VideoGenerationCallbacks(
     val onCompleted: (VideoGenerationResult) -> Unit,
     val onFinished: () -> Unit,
 )
+
+internal object VideoGenerationRequestFactory {
+    fun create(config: VideoGenerationConfig): VideoGenerationRequest =
+        VideoGenerationRequest(
+            prompt = config.prompt,
+            negative = config.negative,
+            width = config.width,
+            height = config.height,
+            videoFrames = config.frames,
+            steps = config.steps,
+            cfgScale = config.cfgScale,
+            seed = config.seed,
+            flowShift = config.flowShift,
+            model = config.model,
+            vae = config.vae,
+            textEncoder = config.textEncoder,
+            flashAttention = true,
+            forceSequentialLoad = false,
+            sampleMethod = config.sampleMethod,
+            scheduler = config.scheduler,
+            loraModelDir = config.loraDirectory ?: config.defaultLoraDirectory,
+            loraApplyMode = LoraApplyMode.AUTO,
+            taehv = config.taehvPath?.let(ModelSpec::localFile),
+            initImage = config.initImage,
+            strength = config.initImageStrength,
+            easyCache =
+                EasyCacheParams(
+                    enabled = config.easyCacheEnabled,
+                    reuseThreshold = 0.2f,
+                    startPercent = 0.15f,
+                    endPercent = 0.95f,
+                ),
+        )
+}
 
 class VideoGenerationController(
     private val context: Context,
@@ -79,8 +114,10 @@ class VideoGenerationController(
         )
         FileLogger.i(tag, "  CFG: ${config.cfgScale}, Seed: ${config.seed}, FlowShift: ${config.flowShift}")
         FileLogger.i(tag, "  Sampler: ${config.sampleMethod}, Scheduler: ${config.scheduler}")
+        FileLogger.i(tag, "  Model: ${config.model ?: "preset default"}")
         FileLogger.i(tag, "  LoRA: ${config.loraDirectory ?: "none"}")
         FileLogger.i(tag, "  TAEHV: ${config.taehvPath ?: "none"}")
+        FileLogger.i(tag, "  EasyCache: ${config.easyCacheEnabled}")
         FileLogger.i(tag, "  I2V: ${config.initImage != null}, Strength: ${config.initImageStrength}")
         FileLogger.i(
             tag,
@@ -114,35 +151,8 @@ class VideoGenerationController(
                     }
 
                     val request =
-                        VideoGenerationRequest(
-                            prompt = config.prompt,
-                            negative = config.negative,
-                            width = config.width,
-                            height = config.height,
-                            videoFrames = config.frames,
-                            steps = config.steps,
-                            cfgScale = config.cfgScale,
-                            seed = config.seed,
-                            flowShift = config.flowShift,
-                            model = config.model,
-                            vae = config.vae,
-                            textEncoder = config.textEncoder,
-                            flashAttention = true,
-                            forceSequentialLoad = false,
-                            sampleMethod = config.sampleMethod,
-                            scheduler = config.scheduler,
-                            loraModelDir = config.loraDirectory ?: config.defaultLoraDirectory,
-                            loraApplyMode = LoraApplyMode.AUTO,
-                            taehv = config.taehvPath?.let(ModelSpec::localFile),
-                            initImage = resizedInitImage,
-                            strength = config.initImageStrength,
-                            easyCache =
-                                EasyCacheParams(
-                                    enabled = true,
-                                    reuseThreshold = 0.2f,
-                                    startPercent = 0.15f,
-                                    endPercent = 0.95f,
-                                ),
+                        VideoGenerationRequestFactory.create(
+                            config.copy(initImage = resizedInitImage),
                         )
 
                     val estimator = StepEtaEstimator()

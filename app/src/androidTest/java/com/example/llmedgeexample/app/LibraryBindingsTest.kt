@@ -68,8 +68,7 @@ class LibraryBindingsTest {
         android.util.Log.i(TAG, "Testing StableDiffusion native bindings...")
         
         val bindingsAvailable = try {
-            // StableDiffusion.isNativeLibraryLoaded() verifies the native library is loaded
-            StableDiffusion.isNativeLibraryLoaded()
+            StableDiffusion.checkBindings()
         } catch (e: UnsatisfiedLinkError) {
             android.util.Log.e(TAG, "StableDiffusion native library not found: ${e.message}")
             false
@@ -152,7 +151,7 @@ class LibraryBindingsTest {
         
         // Test StableDiffusion
         results["StableDiffusion"] = try {
-            StableDiffusion.isNativeLibraryLoaded()
+            StableDiffusion.checkBindings()
         } catch (e: Throwable) {
             android.util.Log.e(TAG, "StableDiffusion: FAILED - ${e.message}")
             false

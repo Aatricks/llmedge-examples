@@ -6,6 +6,7 @@ import io.aatricks.llmedge.image.MiniT2I
 import io.aatricks.llmedge.image.Sd3Medium
 import io.aatricks.llmedge.image.ChromaRadiance
 import io.aatricks.llmedge.image.diffusion.LoraApplyMode
+import io.aatricks.llmedge.model.ModelSpec
 
 internal enum class ImageModelPreset(
     val defaultWidth: Int,
@@ -31,6 +32,8 @@ internal enum class ImageModelPreset(
         seed: Long,
         flashAttention: Boolean,
         negative: String = "",
+        modelOverride: ModelSpec? = null,
+        easyCacheEnabled: Boolean? = null,
     ): ImageGenerationRequest {
         val request = when (this) {
             SD15 -> ImageGenerationRequest(
@@ -100,6 +103,13 @@ internal enum class ImageModelPreset(
                 flashAttention = flashAttention,
             )
         }
-        return request.copy(negative = negative)
+        return request.copy(
+            negative = negative,
+            model = modelOverride ?: request.model,
+            easyCache =
+                request.easyCache.copy(
+                    enabled = easyCacheEnabled ?: request.easyCache.enabled,
+                ),
+        )
     }
 }

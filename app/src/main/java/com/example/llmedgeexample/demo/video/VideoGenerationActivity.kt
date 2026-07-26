@@ -14,8 +14,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.llmedgeexample.R
 import com.example.llmedgeexample.common.*
+import io.aatricks.llmedge.model.ModelSpec
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Activity for video generation using Wan 2.1 and Wan 2.2 models.
@@ -52,6 +56,7 @@ class VideoGenerationActivity : AppCompatActivity() {
     private var generatedFrames: List<Bitmap> = emptyList()
     private var selectedLoraPath: String? = null
     private var selectedTaehvPath: String? = null
+    private var selectedModelOverride: ModelSpec? = null
     private val edge by lazy(LazyThreadSafetyMode.NONE) {
         bindEdge(this, this, lifecycleScope, preferPerformanceMode = !isLowRamDevice())
     }
@@ -83,6 +88,13 @@ class VideoGenerationActivity : AppCompatActivity() {
                 }
             }
 
+    private val modelPickerLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                if (result.resultCode == Activity.RESULT_OK) {
+                    result.data?.data?.let(::loadImportedModel)
+                }
+            }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video_generation)
@@ -107,6 +119,12 @@ class VideoGenerationActivity : AppCompatActivity() {
         views.clearLoraButton.setOnClickListener { clearLoraFile() }
         views.selectTaehvButton.setOnClickListener { selectTaehvFile() }
         views.clearTaehvButton.setOnClickListener { clearTaehvFile() }
+        views.selectModelButton.setOnClickListener {
+            modelPickerLauncher.launch(
+                    ImportedModelSupport.createPickerIntent("Select compatible Wan model (.gguf)"),
+            )
+        }
+        views.clearModelButton.setOnClickListener { clearImportedModel() }
         views.shareLogsButton.setOnClickListener { shareLogs() }
 
         GenerationLogs.currentLogPathLabel()?.let { path ->
@@ -280,6 +298,58 @@ class VideoGenerationActivity : AppCompatActivity() {
         views.clearTaehvButton.visibility = View.GONE
     }
 
+    private fun loadImportedModel(uri: Uri) {
+        val previousModel = selectedModelOverride
+        val previousLabel = views.modelLabel.text
+        views.selectModelButton.isEnabled = false
+        views.generateButton.isEnabled = false
+        views.modelLabel.text = "Importing model..."
+        lifecycleScope.launch {
+            try {
+                val imported =
+                        withContext(Dispatchers.IO) {
+                            ImportedModelSupport.copyToAppStorage(
+                                    context = this@VideoGenerationActivity,
+                                    uri = uri,
+                                    internalNamePrefix = "wan-",
+                            )
+                        }
+                selectedModelOverride = ModelSpec.localFile(imported.file)
+                views.modelLabel.text = imported.displayName
+                views.clearModelButton.visibility = View.VISIBLE
+                views.modelSpinner.isEnabled = false
+                FileLogger.i(TAG, "Imported compatible Wan model: ${imported.file.absolutePath}")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                selectedModelOverride = previousModel
+                views.modelLabel.text = previousLabel
+                views.clearModelButton.visibility =
+                        if (previousModel == null) View.GONE else View.VISIBLE
+                views.modelSpinner.isEnabled = previousModel == null
+                FileLogger.e(TAG, "Failed to import Wan model", t)
+                Toast.makeText(
+                                this@VideoGenerationActivity,
+                                "Failed to import model: ${t.localizedMessage ?: "unknown error"}",
+                                Toast.LENGTH_LONG,
+                        )
+                        .show()
+            } finally {
+                views.selectModelButton.isEnabled = true
+                if (!generationController.isGenerating()) {
+                    views.generateButton.isEnabled = true
+                }
+            }
+        }
+    }
+
+    private fun clearImportedModel() {
+        selectedModelOverride = null
+        views.modelLabel.text = "Use selected preset model"
+        views.clearModelButton.visibility = View.GONE
+        views.modelSpinner.isEnabled = true
+    }
+
     private fun startGeneration() {
         if (generationController.isGenerating()) {
             Toast.makeText(this, R.string.video_status_generation_running, Toast.LENGTH_SHORT)
@@ -368,7 +438,12 @@ class VideoGenerationActivity : AppCompatActivity() {
         val seed = VideoGenerationFormSupport.parseSeedField(views.seedInput, DEFAULT_SEED) ?: return null
         val flowShift = VideoGenerationFormSupport.parseFlowShiftField(views.flowShiftInput) ?: return null
         val modelPreset =
-            VideoGenerationFormSupport.selectedModelPreset(views.modelSpinner.selectedItemPosition)
+            VideoGenerationFormSupport.withModelOverride(
+                    VideoGenerationFormSupport.selectedModelPreset(
+                            views.modelSpinner.selectedItemPosition,
+                    ),
+                    selectedModelOverride,
+            )
 
         return VideoGenerationConfig(
             prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT },
@@ -391,6 +466,7 @@ class VideoGenerationActivity : AppCompatActivity() {
             initImage = initImageBitmap,
             initImageStrength = views.i2vStrengthSeekBar.progress / 100.0f,
             defaultLoraDirectory = getExternalFilesDir("loras")?.absolutePath,
+            easyCacheEnabled = views.easyCacheToggle.isChecked,
         )
     }
 

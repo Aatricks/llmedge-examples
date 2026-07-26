@@ -7,6 +7,7 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.SeekBar
 import android.widget.Spinner
+import android.widget.Switch
 import android.widget.TextView
 import com.example.llmedgeexample.R
 
@@ -22,6 +23,10 @@ internal data class VideoGenerationViews(
     val seedInput: EditText,
     val flowShiftInput: EditText,
     val modelSpinner: Spinner,
+    val selectModelButton: Button,
+    val modelLabel: TextView,
+    val clearModelButton: Button,
+    val easyCacheToggle: Switch,
     val samplerSpinner: Spinner,
     val schedulerSpinner: Spinner,
     val selectLoraButton: Button,
@@ -60,6 +65,10 @@ internal data class VideoGenerationViews(
                 seedInput = activity.findViewById(R.id.videoSeedInput),
                 flowShiftInput = activity.findViewById(R.id.videoFlowShiftInput),
                 modelSpinner = activity.findViewById(R.id.videoModelSpinner),
+                selectModelButton = activity.findViewById(R.id.btnSelectVideoModel),
+                modelLabel = activity.findViewById(R.id.videoModelLabel),
+                clearModelButton = activity.findViewById(R.id.btnClearVideoModel),
+                easyCacheToggle = activity.findViewById(R.id.videoEasyCacheToggle),
                 samplerSpinner = activity.findViewById(R.id.samplerSpinner),
                 schedulerSpinner = activity.findViewById(R.id.schedulerSpinner),
                 selectLoraButton = activity.findViewById(R.id.btnSelectLora),
