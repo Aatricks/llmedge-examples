@@ -169,7 +169,8 @@ Recommended models for bundling:
 
 ### RAG Embeddings
 
-The RAG demo bundles the pinned MiniLM ONNX model and tokenizer for offline use:
+The RAG demo downloads its ONNX embedding model on first use. Builds that place the
+pinned files at this path use them instead, with no network access:
 
 ```
 app/src/main/assets/
@@ -179,8 +180,7 @@ app/src/main/assets/
                       └── tokenizer.json
 ```
 
-Custom builds that omit these assets download the pinned files from
-`sentence-transformers/all-MiniLM-L6-v2` on first use.
+Download from: `sentence-transformers/all-MiniLM-L6-v2` on Hugging Face
 
 ### Runtime Model Cache
 
