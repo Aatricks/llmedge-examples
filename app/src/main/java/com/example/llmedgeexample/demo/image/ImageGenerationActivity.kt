@@ -183,6 +183,10 @@ class ImageGenerationActivity : AppCompatActivity() {
     }
 
     private fun loadImportedModel(uri: Uri) {
+        if (requestPreparationJob?.isActive == true || controller.isGenerating()) {
+            Toast.makeText(this, "Wait for generation to finish", Toast.LENGTH_SHORT).show()
+            return
+        }
         val previousModel = selectedModelOverride
         val previousLabel = views.modelLabel.text
         val internalNamePrefix =
@@ -237,6 +241,14 @@ class ImageGenerationActivity : AppCompatActivity() {
     }
 
     private fun clearImportedModel() {
+        if (requestPreparationJob?.isActive == true || controller.isGenerating()) {
+            return
+        }
+        (selectedModelOverride as? ModelSpec.LocalFile)?.file?.let { file ->
+            if (!ImportedModelSupport.deleteFromAppStorage(this, file)) {
+                FileLogger.w(TAG, "Unable to delete imported model: ${file.absolutePath}")
+            }
+        }
         selectedModelOverride = null
         views.modelLabel.text = "Use selected preset model"
         views.clearModelButton.visibility = View.GONE
@@ -270,6 +282,8 @@ class ImageGenerationActivity : AppCompatActivity() {
         views.progressBar.visibility = View.VISIBLE
         views.progressBar.isIndeterminate = true
         views.generateButton.isEnabled = false
+        views.selectModelButton.isEnabled = false
+        views.clearModelButton.isEnabled = false
         views.upscaleButton.isEnabled = false
         views.saveImageButton.isEnabled = false
         val prompt = views.promptInput.text.toString().ifBlank { DEFAULT_PROMPT }
@@ -374,6 +388,8 @@ class ImageGenerationActivity : AppCompatActivity() {
                                 onFinished = {
                                     views.progressBar.visibility = View.GONE
                                     views.generateButton.isEnabled = true
+                                    views.selectModelButton.isEnabled = true
+                                    views.clearModelButton.isEnabled = true
                                 },
                             ),
                     )
@@ -397,6 +413,10 @@ class ImageGenerationActivity : AppCompatActivity() {
                     }
                 } finally {
                     requestPreparationJob = null
+                    if (!controller.isGenerating() && !isDestroyed) {
+                        views.selectModelButton.isEnabled = true
+                        views.clearModelButton.isEnabled = true
+                    }
                 }
             }
     }

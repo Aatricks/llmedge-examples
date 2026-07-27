@@ -5,6 +5,9 @@ import io.aatricks.llmedge.huggingface.HuggingFaceHub
 import io.aatricks.llmedge.rag.EmbeddingConfig
 import java.io.File
 
+private const val MODEL_ASSET_PATH = "embeddings/all-minilm-l6-v2/model.onnx"
+private const val TOKENIZER_ASSET_PATH = "embeddings/all-minilm-l6-v2/tokenizer.json"
+
 internal fun interface EmbeddingArtifactResolver {
     suspend fun resolve(
         context: Context,
@@ -15,11 +18,20 @@ internal fun interface EmbeddingArtifactResolver {
 
 internal class MiniLmEmbeddingProvisioner(
     private val artifactResolver: EmbeddingArtifactResolver = HuggingFaceEmbeddingArtifactResolver,
+    private val packagedArtifactsAvailable: (Context) -> Boolean = ::hasPackagedMiniLmArtifacts,
 ) {
     suspend fun prepare(
         context: Context,
         onStatus: (String) -> Unit = {},
     ): EmbeddingConfig {
+        if (packagedArtifactsAvailable(context)) {
+            return EmbeddingConfig(
+                modelAssetPath = MODEL_ASSET_PATH,
+                tokenizerAssetPath = TOKENIZER_ASSET_PATH,
+                useTokenTypeIds = false,
+                outputTensorName = "sentence_embedding",
+            )
+        }
         val modelFile =
             resolveArtifact(
                 context = context,
@@ -58,7 +70,20 @@ internal class MiniLmEmbeddingProvisioner(
             }
         }
     }
+
 }
+
+private fun hasPackagedMiniLmArtifacts(context: Context): Boolean =
+    listOf(
+        MODEL_ASSET_PATH,
+        TOKENIZER_ASSET_PATH,
+    ).all { path ->
+        runCatching {
+            context.assets.open(path).use { input ->
+                input.read() >= 0
+            }
+        }.getOrDefault(false)
+    }
 
 private object HuggingFaceEmbeddingArtifactResolver : EmbeddingArtifactResolver {
     private const val REPO_ID = "sentence-transformers/all-MiniLM-L6-v2"

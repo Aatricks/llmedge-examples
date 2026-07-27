@@ -5,6 +5,7 @@ import java.io.File
 import java.net.URI
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.fail
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,6 +33,7 @@ class MiniLmEmbeddingProvisionerTest {
                             else -> error("Unexpected embedding artifact: $filename")
                         }
                     },
+                packagedArtifactsAvailable = { false },
             )
 
         val config = provisioner.prepare(context, statuses::add)
@@ -40,5 +42,30 @@ class MiniLmEmbeddingProvisionerTest {
         assertEquals("{}", File(URI(config.tokenizerAssetPath)).readText())
         assertTrue(statuses.any { it == "Downloading MiniLM model... 50%" })
         assertTrue(statuses.any { it == "Downloading MiniLM tokenizer... 50%" })
+    }
+
+    @Test
+    fun `packaged embeddings initialize without using the network resolver`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val provisioner =
+            MiniLmEmbeddingProvisioner(
+                artifactResolver =
+                    EmbeddingArtifactResolver { _, _, _ ->
+                        fail("Packaged embeddings must not use the network resolver")
+                        error("unreachable")
+                    },
+                packagedArtifactsAvailable = { true },
+            )
+
+        val config = provisioner.prepare(context)
+
+        assertEquals(
+            "embeddings/all-minilm-l6-v2/model.onnx",
+            config.modelAssetPath,
+        )
+        assertEquals(
+            "embeddings/all-minilm-l6-v2/tokenizer.json",
+            config.tokenizerAssetPath,
+        )
     }
 }

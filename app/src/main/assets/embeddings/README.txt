@@ -1,1 +1,2 @@
-The RAG demo downloads the MiniLM ONNX model and tokenizer on first use.
+The RAG demo uses the bundled MiniLM ONNX model and tokenizer without network access.
+Custom builds that omit these assets download and cache the pinned files on first use.

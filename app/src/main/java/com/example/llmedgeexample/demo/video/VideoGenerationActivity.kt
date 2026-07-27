@@ -299,6 +299,10 @@ class VideoGenerationActivity : AppCompatActivity() {
     }
 
     private fun loadImportedModel(uri: Uri) {
+        if (generationController.isGenerating()) {
+            Toast.makeText(this, "Wait for generation to finish", Toast.LENGTH_SHORT).show()
+            return
+        }
         val previousModel = selectedModelOverride
         val previousLabel = views.modelLabel.text
         views.selectModelButton.isEnabled = false
@@ -344,6 +348,14 @@ class VideoGenerationActivity : AppCompatActivity() {
     }
 
     private fun clearImportedModel() {
+        if (generationController.isGenerating()) {
+            return
+        }
+        (selectedModelOverride as? ModelSpec.LocalFile)?.file?.let { file ->
+            if (!ImportedModelSupport.deleteFromAppStorage(this, file)) {
+                FileLogger.w(TAG, "Unable to delete imported model: ${file.absolutePath}")
+            }
+        }
         selectedModelOverride = null
         views.modelLabel.text = "Use selected preset model"
         views.clearModelButton.visibility = View.GONE
@@ -374,6 +386,8 @@ class VideoGenerationActivity : AppCompatActivity() {
 
         updateProgressUI(0, "Preparing parameters...")
         views.generateButton.isEnabled = false
+        views.selectModelButton.isEnabled = false
+        views.clearModelButton.isEnabled = false
         generationController.start(
                 config,
                 VideoGenerationCallbacks(
@@ -391,6 +405,8 @@ class VideoGenerationActivity : AppCompatActivity() {
                         onFinished = {
                             views.progressBar.visibility = View.GONE
                             views.generateButton.isEnabled = true
+                            views.selectModelButton.isEnabled = true
+                            views.clearModelButton.isEnabled = true
                         },
                 ),
         )
