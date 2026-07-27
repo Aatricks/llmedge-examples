@@ -127,6 +127,9 @@ internal class ImageGenerationController(
 
         generationJob =
             scope.launch(ioDispatcher) {
+                // Step progress is otherwise UI-only, which leaves a shared app log unable to say
+                // whether a crash happened before the first step or during the last one.
+                var stepsReached = "none"
                 try {
                     withContext(mainDispatcher) {
                         callbacks.onProgress(0, "Preparing...")
@@ -142,6 +145,7 @@ internal class ImageGenerationController(
                     runtime.generateStream(config.request).collect { event ->
                         when (event) {
                             is GenerationStreamEvent.Progress -> {
+                                stepsReached = "${event.update.current}/${event.update.total}"
                                 val snap = estimator.onStep(event.update.current, event.update.total)
                                 withContext(mainDispatcher) {
                                     callbacks.onProgress(snap.percent, snap.label)
@@ -180,7 +184,8 @@ internal class ImageGenerationController(
                     cancellationReason = ImageGenerationCancellationReason.ERROR
                     updatePhase("out of memory")
                     logError(
-                        "Image request failed with OOM: requestId=$requestId, phase=$currentPhaseText",
+                        "Image request failed with OOM: requestId=$requestId, phase=$currentPhaseText, " +
+                            "stepsReached=$stepsReached",
                         oom,
                     )
                     withContext(NonCancellable + mainDispatcher) {
@@ -190,7 +195,8 @@ internal class ImageGenerationController(
                     cancellationReason = ImageGenerationCancellationReason.ERROR
                     updatePhase("failed")
                     logError(
-                        "Image request failed: requestId=$requestId, phase=$currentPhaseText, message=${t.message}",
+                        "Image request failed: requestId=$requestId, phase=$currentPhaseText, " +
+                            "stepsReached=$stepsReached, message=${t.message}",
                         t,
                     )
                     withContext(NonCancellable + mainDispatcher) {

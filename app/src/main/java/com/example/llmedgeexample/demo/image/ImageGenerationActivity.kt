@@ -212,12 +212,17 @@ class ImageGenerationActivity : AppCompatActivity() {
                             context = this@ImageGenerationActivity,
                             uri = uri,
                             internalNamePrefix = internalNamePrefix,
+                            requireDiffusionOnly = selectedPreset().expectsDiffusionOnlyGguf,
                         )
                     }
                 selectedModelOverride = ModelSpec.localFile(imported.file)
                 views.modelLabel.text = imported.displayName
                 views.clearModelButton.visibility = View.VISIBLE
-                FileLogger.i(TAG, "Imported compatible image model: ${imported.file.absolutePath}")
+                FileLogger.i(
+                    TAG,
+                    "Imported image model for ${selectedPreset()}: ${imported.file.absolutePath} " +
+                        "(${imported.describe()})",
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
