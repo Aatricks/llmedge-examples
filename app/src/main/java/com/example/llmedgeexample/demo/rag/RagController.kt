@@ -11,10 +11,35 @@ import com.example.llmedgeexample.common.logDemoMemoryState
 import io.aatricks.llmedge.LLMEdge
 import io.aatricks.llmedge.rag.RAGSession
 import io.aatricks.llmedge.rag.TextSplitter
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/**
+ * First use downloads both RAG artifacts, so a connectivity failure is the expected
+ * first-run error. Reporting the raw exception hides what the user has to do about it.
+ */
+internal fun ragInitFailureMessage(failure: Throwable): String {
+    val seen = mutableSetOf<Throwable>()
+    var cause: Throwable? = failure
+    while (cause != null && seen.add(cause)) {
+        if (cause is UnknownHostException ||
+            cause is ConnectException ||
+            cause is SocketTimeoutException ||
+            cause is NoRouteToHostException
+        ) {
+            return "No network. First use downloads the MiniLM embedding model (~90 MB) and the " +
+                "Qwen3-0.6B language model (~400 MB). Connect to the internet and reopen this demo."
+        }
+        cause = cause.cause
+    }
+    return "LLM load failed: ${failure.message}"
+}
 
 internal class RagController(
     private val activity: AppCompatActivity,
@@ -68,7 +93,7 @@ internal class RagController(
                 views.statusView.text = "Out of memory. Close other apps and restart."
             } catch (t: Throwable) {
                 android.util.Log.e(TAG, "LLM load failed", t)
-                views.statusView.text = "LLM load failed: ${t.message}"
+                views.statusView.text = ragInitFailureMessage(t)
             }
         }
     }

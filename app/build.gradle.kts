@@ -40,8 +40,12 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             val debugKeySigning = signingConfigs.findByName("debug_key")
             if (debugKeySigning != null) {
                 signingConfig = debugKeySigning
