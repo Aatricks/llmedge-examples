@@ -4,8 +4,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.platform.app.InstrumentationRegistry
 import io.aatricks.llmedge.rag.EmbeddingProvider
-import java.io.File
-import java.net.URI
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -18,7 +16,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class MiniLmEmbeddingDeviceE2ETest {
     @Test
-    fun downloadedEmbeddingFilesInitializeAndEncodeOnDevice() = runBlocking {
+    fun packagedEmbeddingAssetsInitializeAndEncodeOnDevice() = runBlocking {
         assumeTrue(
             "Enable with -e llmedge.miniLmDownloadE2E 1",
             InstrumentationRegistry.getArguments().getString("llmedge.miniLmDownloadE2E") == "1",
@@ -29,12 +27,14 @@ class MiniLmEmbeddingDeviceE2ETest {
             withTimeout(15 * 60_000L) {
                 MiniLmEmbeddingProvisioner().prepare(context)
             }
-        val modelFile = File(URI(config.modelAssetPath))
-        val tokenizerFile = File(URI(config.tokenizerAssetPath))
-        assertTrue(modelFile.isFile)
-        assertTrue(modelFile.length() > 80L * 1024L * 1024L)
-        assertTrue(tokenizerFile.isFile)
-        assertTrue(tokenizerFile.length() > 400L * 1024L)
+        assertEquals("embeddings/all-minilm-l6-v2/model.onnx", config.modelAssetPath)
+        assertEquals("embeddings/all-minilm-l6-v2/tokenizer.json", config.tokenizerAssetPath)
+        context.assets.open(config.modelAssetPath).use { model ->
+            assertTrue(model.available() > 80L * 1024L * 1024L)
+        }
+        context.assets.open(config.tokenizerAssetPath).use { tokenizer ->
+            assertTrue(tokenizer.available() > 400L * 1024L)
+        }
 
         val provider = EmbeddingProvider(context, config)
         try {
