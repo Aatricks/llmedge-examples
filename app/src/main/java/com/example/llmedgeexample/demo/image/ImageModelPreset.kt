@@ -14,14 +14,20 @@ internal enum class ImageModelPreset(
     val defaultSteps: Int,
     val defaultCfg: Float,
     val supportsLora: Boolean,
+    /**
+     * True when this preset routes its model to `diffusion_model_path` and loads the text
+     * encoders and VAE separately, so an imported all-in-one checkpoint would be loaded twice
+     * over — once as the denoiser, once as the downloaded components.
+     */
+    val expectsDiffusionOnlyGguf: Boolean,
 ) {
-    SD15(512, 512, 20, 7.0f, true),
-    FLUX2_KLEIN_BONSAI(512, 512, 4, 1.0f, false),
-    SD3_MEDIUM(512, 512, 28, 4.5f, false),
-    MINI_T2I(512, 512, 100, 6.0f, false),
-    MINI_T2I_LARGE(512, 512, 100, 6.0f, false),
-    CHROMA_MOBILE(512, 512, 20, 4.0f, false),
-    CHROMA_RADIANCE(512, 512, 20, 4.0f, false);
+    SD15(512, 512, 20, 7.0f, true, expectsDiffusionOnlyGguf = false),
+    FLUX2_KLEIN_BONSAI(512, 512, 4, 1.0f, false, expectsDiffusionOnlyGguf = true),
+    SD3_MEDIUM(512, 512, 28, 4.5f, false, expectsDiffusionOnlyGguf = true),
+    MINI_T2I(512, 512, 100, 6.0f, false, expectsDiffusionOnlyGguf = true),
+    MINI_T2I_LARGE(512, 512, 100, 6.0f, false, expectsDiffusionOnlyGguf = true),
+    CHROMA_MOBILE(512, 512, 20, 4.0f, false, expectsDiffusionOnlyGguf = true),
+    CHROMA_RADIANCE(512, 512, 20, 4.0f, false, expectsDiffusionOnlyGguf = true);
 
     fun buildRequest(
         prompt: String,

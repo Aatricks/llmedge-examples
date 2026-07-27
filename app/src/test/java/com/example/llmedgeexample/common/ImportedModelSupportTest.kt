@@ -135,6 +135,123 @@ class ImportedModelSupportTest {
         assertFalse(input.wasRead)
     }
 
+    /**
+     * llmedge-examples#37: importing an all-in-one SD3 checkpoint into a preset that routes it to
+     * `diffusion_model_path` silently double-loads the encoders, and only surfaces much later as a
+     * generation-time worker crash.
+     */
+    @Test
+    fun `all-in-one checkpoint is rejected for a diffusion-only preset`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+        try {
+            ImportedModelSupport.copyToAppStorage(
+                context = context,
+                displayName = "sd3-medium-Q4_0.gguf",
+                input = ByteArrayInputStream(
+                    ggufFile(
+                        "sd3",
+                        listOf(
+                            "model.diffusion_model.joint_blocks.0.weight",
+                            "text_encoders.clip_l.transformer.weight",
+                            "first_stage_model.decoder.conv_in.weight",
+                        ),
+                    ),
+                ),
+                internalNamePrefix = "sd3-${System.nanoTime()}-",
+                requireDiffusionOnly = true,
+            )
+            fail("Expected an all-in-one checkpoint to be rejected")
+        } catch (expected: IllegalArgumentException) {
+            val message = expected.message.orEmpty()
+            assertTrue(message, message.contains("all-in-one"))
+            assertTrue(message, message.contains("text encoders"))
+        }
+    }
+
+    @Test
+    fun `all-in-one checkpoint is accepted when the preset expects one`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+        val imported =
+            ImportedModelSupport.copyToAppStorage(
+                context = context,
+                displayName = "sd15-all-in-one.gguf",
+                input = ByteArrayInputStream(
+                    ggufFile("sd1", listOf("model.diffusion_model.a.weight", "first_stage_model.b.weight")),
+                ),
+                internalNamePrefix = "stable-diffusion-${System.nanoTime()}-",
+                requireDiffusionOnly = false,
+            )
+
+        assertTrue(imported.file.isFile)
+        assertTrue(imported.describe().contains("arch=sd1"))
+    }
+
+    @Test
+    fun `diffusion-only checkpoint passes the diffusion-only check`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+        val imported =
+            ImportedModelSupport.copyToAppStorage(
+                context = context,
+                displayName = "sd3_medium-Q4_0.gguf",
+                input = ByteArrayInputStream(
+                    ggufFile("sd3", listOf("model.diffusion_model.joint_blocks.0.weight")),
+                ),
+                internalNamePrefix = "sd3-${System.nanoTime()}-",
+                requireDiffusionOnly = true,
+            )
+
+        assertTrue(imported.file.isFile)
+        assertTrue(imported.describe().contains("DIFFUSION"))
+    }
+
+    @Test
+    fun `an unparseable header does not block an otherwise valid import`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+        val imported =
+            ImportedModelSupport.copyToAppStorage(
+                context = context,
+                displayName = "opaque.gguf",
+                input = ByteArrayInputStream(ggufBytes(9)),
+                internalNamePrefix = "opaque-${System.nanoTime()}-",
+                requireDiffusionOnly = true,
+            )
+
+        assertTrue(imported.file.isFile)
+        assertTrue(imported.describe().contains("unparseable"))
+    }
+
+    /** Minimal GGUF v3 header: magic, counts, one string metadata entry, then tensor infos. */
+    private fun ggufFile(architecture: String, tensorNames: List<String>): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        fun u32(value: Long) = repeat(4) { out.write(((value shr (it * 8)) and 0xFF).toInt()) }
+        fun u64(value: Long) = repeat(8) { out.write(((value shr (it * 8)) and 0xFF).toInt()) }
+        fun str(value: String) {
+            val bytes = value.toByteArray(Charsets.UTF_8)
+            u64(bytes.size.toLong())
+            out.write(bytes)
+        }
+
+        out.write("GGUF".toByteArray(Charsets.US_ASCII))
+        u32(3)
+        u64(tensorNames.size.toLong())
+        u64(1)
+        str("general.architecture")
+        u32(8)
+        str(architecture)
+        tensorNames.forEach { name ->
+            str(name)
+            u32(1)
+            u64(16)
+            u32(0)
+            u64(0)
+        }
+        return out.toByteArray()
+    }
+
     private fun ggufBytes(marker: Int): ByteArray =
         byteArrayOf(
             'G'.code.toByte(),

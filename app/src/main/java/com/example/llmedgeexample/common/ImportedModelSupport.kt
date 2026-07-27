@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import io.aatricks.llmedge.model.GgufComponent
+import io.aatricks.llmedge.model.GgufFileSummary
 import io.aatricks.llmedge.model.ModelFileValidator
 import java.io.File
 import java.io.InputStream
@@ -15,7 +17,17 @@ import java.security.MessageDigest
 internal data class ImportedModel(
     val file: File,
     val displayName: String,
-)
+    /** Header facts, when parseable — logged so a field bug report names the actual file. */
+    val summary: GgufFileSummary? = null,
+) {
+    /** A one-line description of what the file actually contains, for the app log. */
+    fun describe(): String =
+        summary?.let {
+            "arch=${it.architecture ?: "unknown"}, tensors=${it.tensorCount}, " +
+                "components=${it.components.sorted().joinToString("+").ifEmpty { "unrecognised" }}, " +
+                "bytes=${file.length()}"
+        } ?: "unparseable GGUF header, bytes=${file.length()}"
+}
 
 internal object ImportedModelSupport {
     fun createPickerIntent(title: String): Intent =
@@ -31,6 +43,7 @@ internal object ImportedModelSupport {
         context: Context,
         uri: Uri,
         internalNamePrefix: String = "",
+        requireDiffusionOnly: Boolean = false,
     ): ImportedModel {
         val displayName =
             context.getOpenableDisplayName(
@@ -56,6 +69,7 @@ internal object ImportedModelSupport {
                 input = it,
                 internalNamePrefix = internalNamePrefix,
                 expectedSizeBytes = expectedSizeBytes,
+                requireDiffusionOnly = requireDiffusionOnly,
             )
         }
     }
@@ -66,6 +80,7 @@ internal object ImportedModelSupport {
         input: InputStream,
         internalNamePrefix: String = "",
         expectedSizeBytes: Long? = null,
+        requireDiffusionOnly: Boolean = false,
         availableBytesProvider: (File) -> Long = { directory ->
             android.os.StatFs(directory.absolutePath).availableBytes
         },
@@ -93,6 +108,7 @@ internal object ImportedModelSupport {
         val slotPrefix = safePrefix.ifBlank { "model-" }
         val partialFile = File(targetDirectory, "${slotPrefix}import.partial")
         var targetFile: File? = null
+        var summary: GgufFileSummary? = null
         try {
             partialFile.delete()
             val digest = MessageDigest.getInstance("SHA-256")
@@ -106,6 +122,10 @@ internal object ImportedModelSupport {
                 }
             }
             ModelFileValidator.requireGgufFile(partialFile.absolutePath, "Imported model")
+            summary = GgufFileSummary.read(partialFile)
+            if (requireDiffusionOnly) {
+                requireDiffusionOnlyCheckpoint(summary, safeDisplayName)
+            }
             val contentHash = digest.digest().joinToString("") { "%02x".format(it) }
             val destination = File(targetDirectory, "$slotPrefix$contentHash.gguf")
             targetFile = destination
@@ -135,6 +155,38 @@ internal object ImportedModelSupport {
         return ImportedModel(
             file = requireNotNull(targetFile),
             displayName = safeDisplayName,
+            summary = summary,
+        )
+    }
+
+    /**
+     * Rejects an all-in-one checkpoint for a preset that loads the text encoders and VAE
+     * separately. Such a file goes into `diffusion_model_path`, so its baked-in encoders and the
+     * preset's downloaded ones are both loaded — a misconfiguration that surfaces later as a
+     * generation-time crash rather than a load error, which makes it near-impossible to diagnose
+     * from the app log alone.
+     *
+     * Unreadable headers pass: this is here to explain a known mistake, not to gate imports.
+     */
+    private fun requireDiffusionOnlyCheckpoint(
+        summary: GgufFileSummary?,
+        displayName: String,
+    ) {
+        if (summary == null || !summary.isAllInOne) return
+        val bundled =
+            summary.components
+                .filter { it != GgufComponent.DIFFUSION }
+                .joinToString(" and ") {
+                    when (it) {
+                        GgufComponent.TEXT_ENCODER -> "text encoders"
+                        GgufComponent.VAE -> "a VAE"
+                        GgufComponent.DIFFUSION -> "a denoiser"
+                    }
+                }
+        throw IllegalArgumentException(
+            "$displayName is an all-in-one checkpoint (it bundles $bundled). This preset " +
+                "downloads those separately and needs a diffusion-model-only file. Pick a " +
+                "DiT-only GGUF, or switch to the SD 1.5 preset for all-in-one checkpoints.",
         )
     }
 
