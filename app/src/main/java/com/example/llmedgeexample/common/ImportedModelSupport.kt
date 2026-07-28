@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
-import io.aatricks.llmedge.model.GgufComponent
 import io.aatricks.llmedge.model.GgufFileSummary
 import io.aatricks.llmedge.model.ModelFileValidator
 import java.io.File
@@ -23,10 +22,10 @@ internal data class ImportedModel(
     /** A one-line description of what the file actually contains, for the app log. */
     fun describe(): String =
         summary?.let {
-            "arch=${it.architecture ?: "unknown"}, tensors=${it.tensorCount}, " +
+            "arch=${it.architecture ?: "unknown"}, " +
                 "components=${it.components.sorted().joinToString("+").ifEmpty { "unrecognised" }}, " +
-                "bytes=${file.length()}"
-        } ?: "unparseable GGUF header, bytes=${file.length()}"
+                "prefixes=${it.tensorPrefixes.sorted().joinToString(",")}, bytes=${file.length()}"
+        } ?: "unreadable GGUF header, bytes=${file.length()}"
 }
 
 internal object ImportedModelSupport {
@@ -124,7 +123,7 @@ internal object ImportedModelSupport {
             ModelFileValidator.requireGgufFile(partialFile.absolutePath, "Imported model")
             summary = GgufFileSummary.read(partialFile)
             if (requireDiffusionOnly) {
-                requireDiffusionOnlyCheckpoint(summary, safeDisplayName)
+                ModelFileValidator.requireDiffusionOnlyGguf(partialFile, safeDisplayName)
             }
             val contentHash = digest.digest().joinToString("") { "%02x".format(it) }
             val destination = File(targetDirectory, "$slotPrefix$contentHash.gguf")
@@ -156,37 +155,6 @@ internal object ImportedModelSupport {
             file = requireNotNull(targetFile),
             displayName = safeDisplayName,
             summary = summary,
-        )
-    }
-
-    /**
-     * Rejects an all-in-one checkpoint for a preset that loads the text encoders and VAE
-     * separately. Such a file goes into `diffusion_model_path`, so its baked-in encoders and the
-     * preset's downloaded ones are both loaded — a misconfiguration that surfaces later as a
-     * generation-time crash rather than a load error, which makes it near-impossible to diagnose
-     * from the app log alone.
-     *
-     * Unreadable headers pass: this is here to explain a known mistake, not to gate imports.
-     */
-    private fun requireDiffusionOnlyCheckpoint(
-        summary: GgufFileSummary?,
-        displayName: String,
-    ) {
-        if (summary == null || !summary.isAllInOne) return
-        val bundled =
-            summary.components
-                .filter { it != GgufComponent.DIFFUSION }
-                .joinToString(" and ") {
-                    when (it) {
-                        GgufComponent.TEXT_ENCODER -> "text encoders"
-                        GgufComponent.VAE -> "a VAE"
-                        GgufComponent.DIFFUSION -> "a denoiser"
-                    }
-                }
-        throw IllegalArgumentException(
-            "$displayName is an all-in-one checkpoint (it bundles $bundled). This preset " +
-                "downloads those separately and needs a diffusion-model-only file. Pick a " +
-                "DiT-only GGUF, or switch to the SD 1.5 preset for all-in-one checkpoints.",
         )
     }
 
