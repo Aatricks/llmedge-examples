@@ -223,4 +223,69 @@ class Issue31WanDeviceE2ETest {
             scope.cancel()
         }
     }
+
+    /**
+     * The configuration from llmedge-examples#37: the Hyper-SD3 sequential path at a non-square,
+     * non-default resolution. Square 256x256 is already covered above; aspect ratio is the axis
+     * that has previously broken diffusion runtimes here (see the MiniT2I positional-embedding
+     * fix), and 576x320 is what the field report actually ran.
+     */
+    @Test
+    fun hyperSd3LoraGeneratesNonSquareImageOnDevice() = runBlocking {
+        assumeTrue(
+            "Enable with -e llmedge.issue37NonSquareE2E 1",
+            InstrumentationRegistry.getArguments()
+                .getString("llmedge.issue37NonSquareE2E") == "1",
+        )
+        assumeTrue("Requires arm64 device", Build.SUPPORTED_ABIS.any { it.contains("arm64") })
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val edge = LLMEdge.create(context, scope)
+        try {
+            val prepared =
+                withTimeout(30 * 60_000L) {
+                    ImageGenerationRequestPreparer().prepare(
+                        edge = edge,
+                        baseRequest =
+                            ImageModelPreset.SD3_MEDIUM.buildRequest(
+                                prompt = "a red fox in snow, detailed",
+                                width = 576,
+                                height = 320,
+                                steps = 28,
+                                cfg = 4.5f,
+                                seed = 42L,
+                                flashAttention = false,
+                                easyCacheEnabled = false,
+                            ),
+                        loraRequested = false,
+                        hyperSd3Requested = true,
+                    )
+                }
+            assertEquals(true, prepared.request.sequential)
+            assertEquals(4, prepared.request.steps)
+
+            val bitmap =
+                withTimeout(90 * 60_000L) {
+                    edge.image.generate(prepared.request)
+                }
+
+            assertEquals(576, bitmap.width)
+            assertEquals(320, bitmap.height)
+            val pixels = IntArray(bitmap.width * bitmap.height)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            assertTrue("image is fully transparent or black", pixels.any { (it ushr 24) != 0 && (it and 0x00FFFFFF) != 0 })
+            assertTrue("image is a single flat colour", pixels.toSet().size > 1)
+
+            val outputDirectory = requireNotNull(context.getExternalFilesDir("issue31"))
+            val outputFile = File(outputDirectory, "hyper-sd3-4step-576x320-seed42.png")
+            FileOutputStream(outputFile).use { output ->
+                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+            }
+            assertTrue(outputFile.length() > 0L)
+        } finally {
+            edge.close()
+            scope.cancel()
+        }
+    }
 }
