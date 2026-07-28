@@ -68,6 +68,23 @@ android {
 val verifySdkRevision =
     tasks.register("verifySdkRevision") {
         doLast {
+            // The pin guarantees a *published* release is built from one exact, clean SDK
+            // revision. It cannot hold when the examples are validated against the parent's
+            // working checkout: that check exists to compile against the SDK commit under
+            // review, which is by definition not the pinned one, and the pin can only be
+            // updated by an examples commit that a further SDK commit must then point at —
+            // so an exact match is unreachable across a submodule bump. scripts/
+            // validate_examples.sh sets this; nothing else should.
+            if (System.getenv("LLMEDGE_SKIP_SDK_REVISION_CHECK") == "true") {
+                logger.lifecycle(
+                    "verifySdkRevision: SKIPPED via LLMEDGE_SKIP_SDK_REVISION_CHECK=true — " +
+                        "building against the local SDK checkout, so the release pin " +
+                        "($sdkRevision) and clean-tree checks do not apply. A release built " +
+                        "any other way still enforces both.",
+                )
+                return@doLast
+            }
+
             val sdkRoot = rootProject.projectDir.parentFile
             fun git(vararg arguments: String): Pair<Int, String> {
                 val process =
